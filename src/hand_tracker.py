@@ -1,50 +1,91 @@
 import cv2
+import math
 import mediapipe as mp
-
-mp_hands = mp.solutions.hands
+import mediapipe.python.solutions.hands as mp_hands
+import mediapipe.python.solutions.drawing_utils as mp_drawing
 
 class HandTracker:
-    """ 
-    Handles camera capture, frame flipping, RGB conversion, and
-    extracts screen-scaled (X, Y) pixel coordinates for the index fingertip.
     """
-    def __init__(self, screen_width, screen_height, max_hands=1, min_detection_confidence=0.7):
+    Performance-Optimized Hand Tracker built for fast physical gestures.
+    Includes deadzone coordinate locking to eliminate stationary cursor jitter.
+    """
+    def __init__(self, screen_width, screen_height, max_hands=1, smooth_factor=0.6, cam_index=0):
         self.screen_width = screen_width
         self.screen_height = screen_height
-        
-        self.mp_hands = mp_hands
-        self.hands = self.mp_hands.Hands(
-            max_num_hands=max_hands,
-            min_detection_confidence=min_detection_confidence
-        )
-        self.cap = cv2.VideoCapture(0)
+        self.smooth_factor = smooth_factor
 
-    def get_fingertip_position(self):
-        """
-        Reads frame from webcam, flips horizontally, extracts index fingertip (Landmark 8).
-        Returns a tuple of ((px, py), original_frame).
-        """
+        self.prev_x = None
+        self.prev_y = None
+        self.lost_frames = 0
+        self.max_lost_frames = 4
+
+        self.mp_hands = mp_hands
+        self.mp_drawing = mp_drawing
+        
+        self.hands = self.mp_hands.Hands(
+            static_image_mode=False,
+            max_num_hands=max_hands,
+            model_complexity=0,               # 0 = Lightweight model for maximum FPS
+            min_detection_confidence=0.3,
+            min_tracking_confidence=0.3
+        )
+        
+        self.cap = cv2.VideoCapture(cam_index)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.cap.set(cv2.CAP_PROP_FPS, 60)
+
+    def get_fingertip_position(self, show_preview=True):
         ret, frame = self.cap.read()
-        if not ret:
+        if not ret or frame is None:
             return None, None
 
-        # Mirror frame horizontally so screen movement is intuitive
         frame = cv2.flip(frame, 1)
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.hands.process(rgb_frame)
 
-        pos = None
-        if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
-                tip = hand_landmarks.landmark[8]  # Index Fingertip
-                px = int(tip.x * self.screen_width)
-                py = int(tip.y * self.screen_height)
-                pos = (px, py)
-                break  # Process primary hand only
+        smoothed_pos = None
 
-        return pos, frame
+        if results.multi_hand_landmarks:
+            self.lost_frames = 0
+            for hand_landmarks in results.multi_hand_landmarks:
+                if show_preview:
+                    self.mp_drawing.draw_landmarks(
+                        frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS
+                    )
+
+                tip = hand_landmarks.landmark[8]  # Index Fingertip
+                raw_x = tip.x * self.screen_width
+                raw_y = tip.y * self.screen_height
+
+                if self.prev_x is None or self.prev_y is None:
+                    curr_x, curr_y = raw_x, raw_y
+                else:
+                    curr_x = self.smooth_factor * raw_x + (1 - self.smooth_factor) * self.prev_x
+                    curr_y = self.smooth_factor * raw_y + (1 - self.smooth_factor) * self.prev_y
+
+                # Deadzone lock: ignore tiny 4-pixel landmark fluctuations when holding still
+                if self.prev_x is not None and math.hypot(curr_x - self.prev_x, curr_y - self.prev_y) < 4:
+                    curr_x, curr_y = self.prev_x, self.prev_y
+
+                self.prev_x, self.prev_y = curr_x, curr_y
+                smoothed_pos = (int(curr_x), int(curr_y))
+                break
+        else:
+            self.lost_frames += 1
+            if self.lost_frames <= self.max_lost_frames and self.prev_x is not None:
+                smoothed_pos = (int(self.prev_x), int(self.prev_y))
+            else:
+                self.prev_x = None
+                self.prev_y = None
+
+        if show_preview:
+            cv2.imshow("Hand Tracker Debug Preview", frame)
+            cv2.waitKey(1)
+
+        return smoothed_pos, frame
 
     def release(self):
-        """Releases webcam hardware resources."""
         if self.cap.isOpened():
             self.cap.release()
+        cv2.destroyAllWindows()
