@@ -7,12 +7,13 @@ import mediapipe.python.solutions.drawing_utils as mp_drawing
 class HandTracker:
     """
     Performance-Optimized Hand Tracker built for fast physical gestures.
-    Includes deadzone coordinate locking to eliminate stationary cursor jitter.
+    Includes active camera region remapping to reach screen edges easily.
     """
-    def __init__(self, screen_width, screen_height, max_hands=1, smooth_factor=0.6, cam_index=0):
+    def __init__(self, screen_width, screen_height, max_hands=1, smooth_factor=0.6, margin=0.08, cam_index=0):
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.smooth_factor = smooth_factor
+        self.margin = margin  # 8% camera margin buffer for screen edge mapping
 
         self.prev_x = None
         self.prev_y = None
@@ -25,7 +26,7 @@ class HandTracker:
         self.hands = self.mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=max_hands,
-            model_complexity=0,               # 0 = Lightweight model for maximum FPS
+            model_complexity=0,
             min_detection_confidence=0.3,
             min_tracking_confidence=0.3
         )
@@ -55,16 +56,26 @@ class HandTracker:
                     )
 
                 tip = hand_landmarks.landmark[8]  # Index Fingertip
-                raw_x = tip.x * self.screen_width
-                raw_y = tip.y * self.screen_height
 
+                # Remap camera normalized coordinates [margin, 1 - margin] to screen coordinates [0, 1]
+                norm_x = (tip.x - self.margin) / (1.0 - 2 * self.margin)
+                norm_y = (tip.y - self.margin) / (1.0 - 2 * self.margin)
+
+                # Clamp within screen bounds
+                norm_x = max(0.0, min(1.0, norm_x))
+                norm_y = max(0.0, min(1.0, norm_y))
+
+                raw_x = norm_x * self.screen_width
+                raw_y = norm_y * self.screen_height
+
+                # Exponential Moving Average (EMA) smoothing
                 if self.prev_x is None or self.prev_y is None:
                     curr_x, curr_y = raw_x, raw_y
                 else:
                     curr_x = self.smooth_factor * raw_x + (1 - self.smooth_factor) * self.prev_x
                     curr_y = self.smooth_factor * raw_y + (1 - self.smooth_factor) * self.prev_y
 
-                # Deadzone lock: ignore tiny 4-pixel landmark fluctuations when holding still
+                # Deadzone lock for stationary hand stability
                 if self.prev_x is not None and math.hypot(curr_x - self.prev_x, curr_y - self.prev_y) < 4:
                     curr_x, curr_y = self.prev_x, self.prev_y
 
