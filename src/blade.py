@@ -2,10 +2,7 @@ import pygame
 import math
 
 def check_line_circle_collision(p1, p2, circle_x, circle_y, radius):
-    """
-    Checks if the blade trajectory line segment (from p1 to p2) 
-    intersects a fruit's circular bounding box.
-    """
+   
     x1, y1 = p1
     x2, y2 = p2
     

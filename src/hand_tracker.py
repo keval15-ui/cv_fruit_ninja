@@ -12,7 +12,7 @@ class HandTracker:
     def __init__(self, screen_width, screen_height, max_hands=1, smooth_factor=0.6, margin=0.08, cam_index=0):
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.smooth_factor = smooth_factor
+        self.smooth_factor = max(0.0, min(1.0, smooth_factor))
         self.margin = margin  # 8% camera margin buffer for screen edge mapping
 
         self.prev_x = None
@@ -27,14 +27,16 @@ class HandTracker:
             static_image_mode=False,
             max_num_hands=max_hands,
             model_complexity=0,
-            min_detection_confidence=0.3,
-            min_tracking_confidence=0.3
+            min_detection_confidence=0.5,
+            min_tracking_confidence=0.5
         )
         
         self.cap = cv2.VideoCapture(cam_index)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         self.cap.set(cv2.CAP_PROP_FPS, 60)
+        # Avoid processing an old frame after a fast hand movement.
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
     def get_fingertip_position(self, show_preview=True):
         ret, frame = self.cap.read()
@@ -68,15 +70,21 @@ class HandTracker:
                 raw_x = norm_x * self.screen_width
                 raw_y = norm_y * self.screen_height
 
-                # Exponential Moving Average (EMA) smoothing
+                # Use more smoothing while still and less smoothing during a fast
+                # movement. A fixed EMA makes fast slices visibly lag behind.
                 if self.prev_x is None or self.prev_y is None:
                     curr_x, curr_y = raw_x, raw_y
                 else:
-                    curr_x = self.smooth_factor * raw_x + (1 - self.smooth_factor) * self.prev_x
-                    curr_y = self.smooth_factor * raw_y + (1 - self.smooth_factor) * self.prev_y
+                    movement = math.hypot(raw_x - self.prev_x, raw_y - self.prev_y)
+                    adaptive_factor = min(
+                        0.95,
+                        max(self.smooth_factor, 0.35 + movement / 250.0)
+                    )
+                    curr_x = adaptive_factor * raw_x + (1 - adaptive_factor) * self.prev_x
+                    curr_y = adaptive_factor * raw_y + (1 - adaptive_factor) * self.prev_y
 
                 # Deadzone lock for stationary hand stability
-                if self.prev_x is not None and math.hypot(curr_x - self.prev_x, curr_y - self.prev_y) < 4:
+                if self.prev_x is not None and math.hypot(curr_x - self.prev_x, curr_y - self.prev_y) < 3:
                     curr_x, curr_y = self.prev_x, self.prev_y
 
                 self.prev_x, self.prev_y = curr_x, curr_y
