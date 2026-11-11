@@ -1,25 +1,31 @@
 import pygame
 import math
 import os
+import random
 
 class CalibrationScreen:
     """
     Dedicated screen for pre-game Index Finger Calibration.
-    Locks user tracking, verifies camera reach and lighting,
-    and displays an interactive hold-to-confirm progress target ring
-    with calibration.jpg as the background.
+    Enhanced with dynamic holographic radar sweep, rotating calibration ticks,
+    ambient glow, and pulse animations over calibration.jpg.
     """
-    def __init__(self, screen_width, screen_height, target_radius=65, hold_duration=1.5):
+    def __init__(self, screen_width, screen_height, target_radius=75, hold_duration=1.5):
         self.width = screen_width
         self.height = screen_height
-        self.target_center = (screen_width // 2, screen_height // 2)
+        self.target_center = (screen_width // 2, screen_height // 2 + 15)
         self.target_radius = target_radius
         self.hold_duration = hold_duration
         self.timer = 0.0
         self.is_complete = False
 
-        self.title_font = pygame.font.SysFont("Arial", 44, bold=True)
+        # Visual animation parameters
+        self.sweep_angle = 0.0
+        self.ring_pulse = 0.0
+
+        self.title_font = pygame.font.SysFont("Arial", 46, bold=True)
         self.sub_font = pygame.font.SysFont("Arial", 22)
+        self.status_font = pygame.font.SysFont("Arial", 24, bold=True)
+        self.micro_font = pygame.font.SysFont("Arial", 15)
 
         # Load calibration background image
         self.bg_image = None
@@ -34,10 +40,9 @@ class CalibrationScreen:
                 self.bg_image = None
 
     def update(self, pos, dt):
-        """
-        Updates the calibration timer.
-        Returns True when calibration completes successfully.
-        """
+        self.sweep_angle += dt * 3.5
+        self.ring_pulse += dt * 2.0
+
         if self.is_complete:
             return True
 
@@ -57,54 +62,94 @@ class CalibrationScreen:
         return False
 
     def reset(self):
-        """Resets calibration state."""
         self.timer = 0.0
         self.is_complete = False
 
     def handle_event(self, event):
-        # Allow pressing Space or Enter to skip calibration if user prefers
         if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_RETURN):
             self.is_complete = True
 
     def draw(self, surface):
-        """Draws the calibration background, dark overlay, and target progress ring."""
+        cx, cy = self.target_center
+        progress = min(1.0, self.timer / self.hold_duration)
+        active_color = (0, 255, 160) if progress > 0.8 else (0, 240, 255)
+
+        # 1. Background image
         if self.bg_image:
             surface.blit(self.bg_image, (0, 0))
         else:
-            surface.fill((15, 15, 25))
+            surface.fill((14, 16, 26))
 
-        # Semi-transparent dark overlay for high contrast and readability
+        # 2. Tech grid vignette overlay
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        overlay.fill((10, 10, 20, 140))
+        overlay.fill((8, 12, 22, 145))
         surface.blit(overlay, (0, 0))
 
-        # Title & Instructions
-        title_surf = self.title_font.render("INDEX FINGER SCANNER", True, (0, 240, 255))
+        # 3. Header Title & Instructions
+        title_surf = self.title_font.render("HOLOGRAPHIC SENSOR CALIBRATION", True, (0, 240, 255))
+        glow_title = self.title_font.render("HOLOGRAPHIC SENSOR CALIBRATION", True, (0, 160, 255))
+        title_x = self.width // 2 - title_surf.get_width() // 2
+        surface.blit(glow_title, (title_x + 1, 61))
+        surface.blit(title_surf, (title_x, 60))
+
         sub_surf = self.sub_font.render(
-            "Place your index finger inside the ring to lock calibration & test tracking", 
-            True, (200, 200, 200)
+            "Align your index fingertip inside the optical ring to synchronize motion tracking",
+            True, (210, 225, 240)
         )
-        surface.blit(title_surf, (self.width // 2 - title_surf.get_width() // 2, 70))
-        surface.blit(sub_surf, (self.width // 2 - sub_surf.get_width() // 2, 130))
+        surface.blit(sub_surf, (self.width // 2 - sub_surf.get_width() // 2, 115))
 
-        # Render Target Ring
-        cx, cy = self.target_center
-        progress = min(1.0, self.timer / self.hold_duration)
-        ring_color = (0, 255, 150) if progress > 0.9 else (0, 240, 255)
+        # 4. Outer Holographic Reticle Ring with Animated Ticks
+        outer_reticle_r = self.target_radius + 36
+        num_ticks = 24
+        for i in range(num_ticks):
+            angle = (i / num_ticks) * (math.pi * 2) + self.sweep_angle * 0.3
+            tick_len = 10 if i % 4 == 0 else 5
+            x1 = cx + math.cos(angle) * outer_reticle_r
+            y1 = cy + math.sin(angle) * outer_reticle_r
+            x2 = cx + math.cos(angle) * (outer_reticle_r + tick_len)
+            y2 = cy + math.sin(angle) * (outer_reticle_r + tick_len)
+            col = active_color if i % 4 == 0 else (60, 90, 130)
+            pygame.draw.line(surface, col, (x1, y1), (x2, y2), 2)
 
-        pygame.draw.circle(surface, (50, 50, 75), (cx, cy), self.target_radius, 4)
-        pygame.draw.circle(surface, ring_color, (cx, cy), self.target_radius + 8, 2)
+        # Concentric guide circles
+        pulse_offset = math.sin(self.ring_pulse) * 3
+        pygame.draw.circle(surface, (45, 65, 95), (cx, cy), int(self.target_radius + 20 + pulse_offset), 1)
+        pygame.draw.circle(surface, (30, 45, 70), (cx, cy), self.target_radius, 2)
 
-        # Draw Filling Progress Circle
+        # 5. Radar Sweep Line
+        sweep_len = self.target_radius + 15
+        sx = cx + math.cos(self.sweep_angle) * sweep_len
+        sy = cy + math.sin(self.sweep_angle) * sweep_len
+        pygame.draw.line(surface, (*active_color, 180), (cx, cy), (sx, sy), 2)
+
+        # 6. Radial Filling Progress
         if progress > 0:
             fill_radius = int(self.target_radius * progress)
-            pygame.draw.circle(surface, (*ring_color, 120), (cx, cy), fill_radius)
+            fill_surf = pygame.Surface((fill_radius * 2 + 4, fill_radius * 2 + 4), pygame.SRCALPHA)
+            pygame.draw.circle(fill_surf, (*active_color, 110), (fill_radius + 2, fill_radius + 2), fill_radius)
+            surface.blit(fill_surf, (cx - fill_radius - 2, cy - fill_radius - 2))
 
-        # Center Status Text
-        status_txt = "HOLD STILL" if progress > 0 else "POINT HERE"
-        txt_surf = self.sub_font.render(status_txt, True, (255, 255, 255))
+            # Outer arc glow indicator
+            arc_rect = pygame.Rect(cx - self.target_radius - 8, cy - self.target_radius - 8, (self.target_radius + 8) * 2, (self.target_radius + 8) * 2)
+            pygame.draw.arc(surface, active_color, arc_rect, -math.pi / 2, -math.pi / 2 + progress * (math.pi * 2), 4)
+
+        # Main active ring border
+        pygame.draw.circle(surface, active_color, (cx, cy), self.target_radius + 8, 2)
+
+        # 7. Center Status Text & Percentage
+        if progress > 0:
+            status_txt = f"LOCKING {int(progress * 100)}%"
+            txt_surf = self.status_font.render(status_txt, True, (255, 255, 255))
+        else:
+            txt_surf = self.status_font.render("POINT HERE", True, (0, 240, 255))
+
         surface.blit(txt_surf, (cx - txt_surf.get_width() // 2, cy - txt_surf.get_height() // 2))
 
-        # Skip hint
-        hint_surf = self.sub_font.render("(Press SPACE or ENTER to skip)", True, (150, 150, 170))
-        surface.blit(hint_surf, (self.width // 2 - hint_surf.get_width() // 2, self.height - 50))
+        # Micro sub-hint
+        hint_label = "HOLD STEADY" if progress > 0 else "TARGET ACQUISITION"
+        hl_surf = self.micro_font.render(hint_label, True, (180, 200, 220))
+        surface.blit(hl_surf, (cx - hl_surf.get_width() // 2, cy + 24))
+
+        # Bottom Skip Hint
+        skip_surf = self.micro_font.render("Press SPACE or ENTER to bypass calibration", True, (140, 155, 175))
+        surface.blit(skip_surf, (self.width // 2 - skip_surf.get_width() // 2, self.height - 45))

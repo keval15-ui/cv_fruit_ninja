@@ -1,37 +1,83 @@
 import pygame
 import os
 import math
+import random
 
-class MenuButton:
+class AmbientOrb:
+    """Floating particles on menus for lively visuals."""
+    def __init__(self, screen_w, screen_h):
+        self.screen_w = screen_w
+        self.screen_h = screen_h
+        self.reset()
+
+    def reset(self):
+        self.x = random.uniform(0, self.screen_w)
+        self.y = random.uniform(self.screen_h, self.screen_h + 100)
+        self.radius = random.uniform(2, 6)
+        self.speed = random.uniform(20, 50)
+        self.angle = random.uniform(0, math.pi * 2)
+        self.color = random.choice([
+            (0, 240, 255),
+            (255, 170, 0),
+            (255, 75, 130),
+            (0, 255, 180)
+        ])
+        self.alpha = random.randint(60, 160)
+
+    def update(self, dt):
+        self.y -= self.speed * dt
+        self.x += math.sin(self.angle) * 0.5
+        self.angle += dt * 1.5
+        if self.y < -20:
+            self.reset()
+
+    def draw(self, surface):
+        s = pygame.Surface((int(self.radius * 2 + 2), int(self.radius * 2 + 2)), pygame.SRCALPHA)
+        pygame.draw.circle(s, (*self.color, int(self.alpha)), (int(self.radius + 1), int(self.radius + 1)), int(self.radius))
+        surface.blit(s, (int(self.x - self.radius), int(self.y - self.radius)))
+
+
+class CircleMenuButton:
     """
-    Interactive Button for Fruit Ninja Menu.
-    Can be activated either by slicing/holding the fingertip or clicking the mouse.
+    Circular Fruit-Ninja style Menu Button.
+    Features:
+    - Glowing concentric circular rings
+    - Pulsing breathing animation
+    - Slice-through detection & hold-to-confirm radial progress arc
+    - Mouse click & CV finger tracking support
     """
-    def __init__(self, action_id, text, x, y, width, height, color=(0, 200, 255), icon=""):
+    def __init__(self, action_id, title, subtitle, cx, cy, radius=95, theme_color=(0, 240, 255), badge=""):
         self.action_id = action_id
-        self.text = text
-        self.rect = pygame.Rect(x, y, width, height)
-        self.color = color
-        self.icon = icon
-        self.hover_progress = 0.0  # 0.0 to 1.0 (holds to trigger)
-        self.hold_threshold = 0.8  # seconds to hold or slice through
+        self.title = title
+        self.subtitle = subtitle
+        self.cx = cx
+        self.cy = cy
+        self.base_radius = radius
+        self.radius = radius
+        self.theme_color = theme_color
+        self.badge = badge
+
+        self.hover_progress = 0.0
+        self.hold_threshold = 0.7  # seconds to trigger on hold
         self.is_hovered = False
+        self.pulse_phase = random.uniform(0, math.pi * 2)
+
+    def collide_point(self, pt):
+        return math.hypot(pt[0] - self.cx, pt[1] - self.cy) <= self.radius
 
     def update(self, pos, blade_speed, dt):
-        """
-        Updates button hover / slice status.
-        Returns True if the button is triggered.
-        """
+        self.pulse_phase += dt * 2.5
         self.is_hovered = False
-        if pos is not None and self.rect.collidepoint(pos):
+
+        if pos is not None and self.collide_point(pos):
             self.is_hovered = True
-            
-            # Instant trigger if sliced at speed!
-            if blade_speed > 10:
+
+            # Instant trigger if sliced through at speed!
+            if blade_speed > 9:
                 self.hover_progress = 1.0
                 return True
 
-            # Otherwise, hold-to-confirm progress
+            # Hold to trigger
             self.hover_progress += dt / self.hold_threshold
             if self.hover_progress >= 1.0:
                 self.hover_progress = 0.0
@@ -39,52 +85,105 @@ class MenuButton:
         else:
             self.hover_progress = max(0.0, self.hover_progress - dt * 2.5)
 
+        # Subtle smooth scale on hover
+        target_r = self.base_radius + (12 if self.is_hovered else 0)
+        self.radius += (target_r - self.radius) * min(1.0, dt * 10)
+
         return False
 
-    def draw(self, surface, font, sub_font):
-        # Draw background container
-        bg_color = (25, 30, 45, 200) if not self.is_hovered else (45, 55, 80, 230)
-        btn_surf = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
-        pygame.draw.rect(btn_surf, bg_color, (0, 0, self.rect.width, self.rect.height), border_radius=16)
+    def draw(self, surface, title_font, sub_font, small_font):
+        cx, cy = int(self.cx), int(self.cy)
+        r = int(self.radius)
 
-        # Border glow
-        border_color = (0, 255, 200) if self.hover_progress > 0.5 else (self.color if self.is_hovered else (80, 100, 140))
-        border_width = 3 if self.is_hovered else 2
-        pygame.draw.rect(btn_surf, border_color, (0, 0, self.rect.width, self.rect.height), border_width, border_radius=16)
+        # 1. Subtle Outer Glow
+        glow_radius = int(r + 15 + math.sin(self.pulse_phase) * 4)
+        glow_surf = pygame.Surface((glow_radius * 2 + 4, glow_radius * 2 + 4), pygame.SRCALPHA)
+        glow_alpha = 45 if not self.is_hovered else 85
+        pygame.draw.circle(
+            glow_surf,
+            (*self.theme_color[:3], glow_alpha),
+            (glow_radius + 2, glow_radius + 2),
+            glow_radius
+        )
+        surface.blit(glow_surf, (cx - glow_radius - 2, cy - glow_radius - 2))
 
-        # Hold/Slice progress fill
+        # 2. Translucent Circular Orb Body
+        body_surf = pygame.Surface((r * 2 + 4, r * 2 + 4), pygame.SRCALPHA)
+        bg_alpha = 230 if self.is_hovered else 190
+        base_fill = (20, 24, 38, bg_alpha)
+        pygame.draw.circle(body_surf, base_fill, (r + 2, r + 2), r)
+
+        # Inner subtle gradient / highlight on top
+        highlight_rect = pygame.Rect(r - int(r * 0.6) + 2, 8, int(r * 1.2), int(r * 0.5))
+        pygame.draw.ellipse(body_surf, (255, 255, 255, 25), highlight_rect)
+
+        # 3. Holding/Slicing Radial Progress Fill
         if self.hover_progress > 0:
-            fill_w = int(self.rect.width * self.hover_progress)
-            fill_surf = pygame.Surface((fill_w, self.rect.height), pygame.SRCALPHA)
-            fill_surf.fill((*self.color[:3], 90))
-            btn_surf.blit(fill_surf, (0, 0))
+            fill_r = int(r * self.hover_progress)
+            pygame.draw.circle(body_surf, (*self.theme_color[:3], 95), (r + 2, r + 2), fill_r)
 
-        surface.blit(btn_surf, (self.rect.x, self.rect.y))
+        # 4. Ring Borders
+        ring_color = (255, 255, 255) if self.is_hovered else self.theme_color
+        border_w = 4 if self.is_hovered else 3
+        pygame.draw.circle(body_surf, ring_color, (r + 2, r + 2), r, border_w)
 
-        # Text label
-        txt_surf = font.render(self.text, True, (255, 255, 255))
-        surface.blit(txt_surf, (self.rect.centerx - txt_surf.get_width() // 2, self.rect.centery - txt_surf.get_height() // 2 - 4))
+        # Dotted / dashed decorative inner ring
+        inner_r = max(10, r - 10)
+        pygame.draw.circle(body_surf, (*self.theme_color[:3], 120), (r + 2, r + 2), inner_r, 1)
 
-        # Subtitle / Hint
-        sub_text = "Slice or Hold" if self.is_hovered else "Point or Click"
-        hint_surf = sub_font.render(sub_text, True, (180, 200, 220))
-        surface.blit(hint_surf, (self.rect.centerx - hint_surf.get_width() // 2, self.rect.bottom - 22))
+        surface.blit(body_surf, (cx - r - 2, cy - r - 2))
+
+        # 5. Progress Arc Overlay when holding
+        if self.hover_progress > 0.05:
+            arc_rect = pygame.Rect(cx - r - 6, cy - r - 6, (r + 6) * 2, (r + 6) * 2)
+            angle_span = self.hover_progress * (math.pi * 2)
+            # Pygame arc draws counterclockwise from 0 (3 o'clock)
+            pygame.draw.arc(surface, (0, 255, 200), arc_rect, -math.pi / 2, -math.pi / 2 + angle_span, 5)
+
+        # 6. Button Text & Subtitle
+        t_surf = title_font.render(self.title, True, (255, 255, 255))
+        surface.blit(t_surf, (cx - t_surf.get_width() // 2, cy - t_surf.get_height() // 2 - 12))
+
+        sub_col = (0, 255, 200) if self.is_hovered else (200, 220, 240)
+        s_surf = sub_font.render(self.subtitle, True, sub_col)
+        surface.blit(s_surf, (cx - s_surf.get_width() // 2, cy + 14))
+
+        # Action Instruction
+        hint_txt = "SLICE or HOLD" if self.is_hovered else "SLICE"
+        hint_surf = small_font.render(hint_txt, True, (160, 180, 200))
+        surface.blit(hint_surf, (cx - hint_surf.get_width() // 2, cy + 36))
+
+        # Badge pill (if any)
+        if self.badge:
+            badge_surf = small_font.render(self.badge, True, (255, 255, 255))
+            bw, bh = badge_surf.get_width() + 14, badge_surf.get_height() + 4
+            bpill = pygame.Surface((bw, bh), pygame.SRCALPHA)
+            pygame.draw.rect(bpill, (255, 45, 85, 230), (0, 0, bw, bh), border_radius=8)
+            surface.blit(bpill, (cx - bw // 2, cy - r - bh // 2 + 2))
+            surface.blit(badge_surf, (cx - badge_surf.get_width() // 2, cy - r - bh // 2 + 4))
 
 
 class MenuScreen:
     """
-    Landing Page / Main Menu Screen.
-    Contains options: START, BLADE, MULTIPLAYER.
-    Uses background-landing.jpg as the backdrop.
+    Premium Cyber Fruit Ninja Landing Page.
+    Features:
+    - Circular interactive target buttons for START, BLADE, MULTIPLAYER
+    - Ambient glowing particles
+    - Cinematic title with neon glows
+    - background-landing.jpg backdrop
     """
     def __init__(self, width, height):
         self.width = width
         self.height = height
 
-        self.title_font = pygame.font.SysFont("Arial", 54, bold=True)
-        self.btn_font = pygame.font.SysFont("Arial", 28, bold=True)
-        self.sub_font = pygame.font.SysFont("Arial", 16)
+        self.title_font = pygame.font.SysFont("Arial", 56, bold=True)
+        self.btn_title_font = pygame.font.SysFont("Arial", 22, bold=True)
+        self.btn_sub_font = pygame.font.SysFont("Arial", 16, bold=True)
+        self.small_font = pygame.font.SysFont("Arial", 13)
         self.modal_font = pygame.font.SysFont("Arial", 24)
+
+        # Ambient floating particle orbs
+        self.orbs = [AmbientOrb(width, height) for _ in range(25)]
 
         # Load background-landing.jpg
         self.bg_image = None
@@ -97,36 +196,34 @@ class MenuScreen:
             except Exception as e:
                 print(f"[Warning] Failed to load landing background: {e}")
 
-        # Setup Buttons: START, BLADE, MULTIPLAYER
-        btn_w, btn_h = 280, 85
-        spacing = 30
-        total_w = (btn_w * 3) + (spacing * 2)
-        start_x = (width - total_w) // 2
-        btn_y = height // 2 + 60
+        # Setup Circular Buttons
+        btn_radius = 88
+        cy = height // 2 + 85
+        spacing = 290
+        center_x = width // 2
 
         self.buttons = [
-            MenuButton("start", "START GAME", start_x, btn_y, btn_w, btn_h, color=(0, 240, 255)),
-            MenuButton("blade", "BLADE SELECT", start_x + (btn_w + spacing), btn_y, btn_w, btn_h, color=(255, 170, 0)),
-            MenuButton("multiplayer", "MULTIPLAYER", start_x + (btn_w + spacing) * 2, btn_y, btn_w, btn_h, color=(255, 75, 130))
+            CircleMenuButton("start", "START", "CLASSIC SOLO", center_x - spacing, cy, radius=btn_radius, theme_color=(0, 240, 255)),
+            CircleMenuButton("blade", "BLADE", "CUSTOMIZE", center_x, cy, radius=btn_radius, theme_color=(255, 175, 0)),
+            CircleMenuButton("multiplayer", "VS MODE", "MULTIPLAYER", center_x + spacing, cy, radius=btn_radius, theme_color=(255, 65, 130), badge="2-PLAYER")
         ]
 
         self.info_modal = None
         self.modal_timer = 0.0
 
     def handle_event(self, event):
-        """Allows mouse click navigation in addition to CV finger tracking."""
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mx, my = event.pos
             for btn in self.buttons:
-                if btn.rect.collidepoint((mx, my)):
+                if btn.collide_point((mx, my)):
                     return self._trigger_action(btn.action_id)
 
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_1 or event.key == pygame.K_s:
+            if event.key in (pygame.K_1, pygame.K_s):
                 return "start"
-            elif event.key == pygame.K_2 or event.key == pygame.K_b:
+            elif event.key in (pygame.K_2, pygame.K_b):
                 return "blade"
-            elif event.key == pygame.K_3 or event.key == pygame.K_m:
+            elif event.key in (pygame.K_3, pygame.K_m):
                 return self._trigger_action("multiplayer")
             elif event.key == pygame.K_ESCAPE and self.info_modal:
                 self.info_modal = None
@@ -135,16 +232,15 @@ class MenuScreen:
 
     def _trigger_action(self, action_id):
         if action_id == "multiplayer":
-            self.info_modal = "MULTIPLAYER MODE (COMING SOON)\nDual-Camera / Split-Screen 2-Player Co-op!"
+            self.info_modal = "MULTIPLAYER 2-PLAYER CO-OP\nDual Hand Tracking / Split Screen Coming Soon!"
             self.modal_timer = 2.5
             return None
         return action_id
 
     def update(self, pos, blade_speed, dt):
-        """
-        Updates button interactions with fingertip tracking.
-        Returns the next screen action ('start', 'blade', etc.) or None.
-        """
+        for orb in self.orbs:
+            orb.update(dt)
+
         if self.info_modal:
             self.modal_timer -= dt
             if self.modal_timer <= 0:
@@ -159,41 +255,55 @@ class MenuScreen:
         return None
 
     def draw(self, surface):
-        # 1. Render Landing Background
+        # 1. Background image
         if self.bg_image:
             surface.blit(self.bg_image, (0, 0))
         else:
-            surface.fill((18, 18, 30))
+            surface.fill((16, 18, 28))
 
-        # 2. Translucent Overlay for contrast
+        # 2. Modern dark vignette overlay
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        overlay.fill((10, 12, 24, 135))
+        overlay.fill((8, 12, 22, 140))
         surface.blit(overlay, (0, 0))
 
-        # 3. Main Title Banner
-        title_surf = self.title_font.render("CV FRUIT NINJA", True, (0, 240, 255))
-        glow_surf = self.title_font.render("CV FRUIT NINJA", True, (0, 180, 255))
-        title_x = self.width // 2 - title_surf.get_width() // 2
-        surface.blit(glow_surf, (title_x + 2, 92))
-        surface.blit(title_surf, (title_x, 90))
+        # 3. Ambient Orbs
+        for orb in self.orbs:
+            orb.draw(surface)
 
-        tagline = self.modal_font.render("Wave, Hold, or Slice to Select Your Mode", True, (210, 230, 245))
-        surface.blit(tagline, (self.width // 2 - tagline.get_width() // 2, 160))
+        # 4. Cinematic Title Section
+        title_y = 100
+        # Glow layer
+        glow_surf = self.title_font.render("CV FRUIT NINJA", True, (0, 200, 255))
+        glow_blur = pygame.transform.smoothscale(glow_surf, (glow_surf.get_width() + 4, glow_surf.get_height() + 4))
+        surface.blit(glow_blur, (self.width // 2 - glow_blur.get_width() // 2, title_y - 2))
 
-        # 4. Render Menu Buttons
+        # Main text
+        title_surf = self.title_font.render("CV FRUIT NINJA", True, (255, 255, 255))
+        surface.blit(title_surf, (self.width // 2 - title_surf.get_width() // 2, title_y))
+
+        # Subtitle badge banner
+        banner_txt = "MOTION DETECTION EDITION  •  SLICE TO SELECT"
+        sub_banner = self.btn_sub_font.render(banner_txt, True, (0, 240, 255))
+        surface.blit(sub_banner, (self.width // 2 - sub_banner.get_width() // 2, title_y + 70))
+
+        # 5. Circular Buttons
         for btn in self.buttons:
-            btn.draw(surface, self.btn_font, self.sub_font)
+            btn.draw(surface, self.btn_title_font, self.btn_sub_font, self.small_font)
 
-        # 5. Modal popup if triggered (e.g. Multiplayer notice)
+        # 6. Bottom Navigation Hint
+        foot_txt = self.small_font.render("Use your index finger to slice any circle  |  Keys: [1] Start  [2] Blade  [3] Multiplayer", True, (160, 175, 195))
+        surface.blit(foot_txt, (self.width // 2 - foot_txt.get_width() // 2, self.height - 35))
+
+        # 7. Modal
         if self.info_modal:
-            modal_rect = pygame.Rect(self.width // 2 - 250, self.height // 2 - 80, 500, 160)
+            modal_rect = pygame.Rect(self.width // 2 - 270, self.height // 2 - 80, 540, 160)
             modal_surf = pygame.Surface((modal_rect.width, modal_rect.height), pygame.SRCALPHA)
             modal_surf.fill((15, 20, 35, 245))
-            pygame.draw.rect(modal_surf, (255, 75, 130), (0, 0, modal_rect.width, modal_rect.height), 3, border_radius=16)
+            pygame.draw.rect(modal_surf, (255, 65, 130), (0, 0, modal_rect.width, modal_rect.height), 3, border_radius=20)
             surface.blit(modal_surf, (modal_rect.x, modal_rect.y))
 
             lines = self.info_modal.split("\n")
             for i, line in enumerate(lines):
-                c = (255, 255, 255) if i == 0 else (200, 220, 240)
+                c = (255, 255, 255) if i == 0 else (200, 220, 245)
                 txt = self.modal_font.render(line, True, c)
                 surface.blit(txt, (modal_rect.centerx - txt.get_width() // 2, modal_rect.y + 40 + i * 40))
