@@ -33,8 +33,8 @@ class HandTracker:
             static_image_mode=False,
             max_num_hands=max_hands,
             model_complexity=1,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.4,
+            min_tracking_confidence=0.4
         )
         
         # Camera Setup with Buffer Size 1 to eliminate frame queue delay
@@ -81,7 +81,9 @@ class HandTracker:
 
             frame = cv2.flip(frame, 1)
             rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            rgb_frame.flags.writeable = False
             results = self.hands.process(rgb_frame)
+            rgb_frame.flags.writeable = True
 
             smoothed_pos = None
 
@@ -95,6 +97,11 @@ class HandTracker:
 
                     self.lost_frames = 0
                     tip = hand_landmarks.landmark[8]
+                    tip_pixel = (
+                        int(tip.x * frame.shape[1]),
+                        int(tip.y * frame.shape[0])
+                    )
+                    cv2.circle(frame, tip_pixel, 8, (0, 255, 255), -1)
 
                     # Remap camera margin buffer to screen resolution
                     norm_x = (tip.x - self.margin) / (1.0 - 2 * self.margin)
@@ -110,10 +117,10 @@ class HandTracker:
                         curr_x, curr_y = raw_x, raw_y
                     else:
                         movement = math.hypot(raw_x - self.prev_x, raw_y - self.prev_y)
-                        if movement < 8:
+                        if movement < 5:
                             curr_x, curr_y = self.prev_x, self.prev_y
                         else:
-                            dynamic_smooth = 0.9 if movement > 35 else 0.72
+                            dynamic_smooth = 0.95 if movement > 35 else 0.78
                             curr_x = dynamic_smooth * raw_x + (1 - dynamic_smooth) * self.prev_x
                             curr_y = dynamic_smooth * raw_y + (1 - dynamic_smooth) * self.prev_y
 
