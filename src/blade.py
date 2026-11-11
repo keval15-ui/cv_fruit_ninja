@@ -33,7 +33,8 @@ class Blade:
         self.max_points = max_points
         self.outer_color = outer_color
         self.inner_color = inner_color
-        self.min_movement_dist = 6  # Minimum pixels moved to add a new trail point
+        self.min_movement_dist = 3
+        self.current_speed = 0.0
 
     def update(self, current_pos):
         """
@@ -43,29 +44,26 @@ class Blade:
         if current_pos is not None:
             if not self.blade_pts:
                 self.blade_pts.append(current_pos)
+                self.current_speed = 0.0
             else:
                 last_pt = self.blade_pts[-1]
                 dist = math.hypot(current_pos[0] - last_pt[0], current_pos[1] - last_pt[1])
                 
                 if dist >= self.min_movement_dist:
                     self.blade_pts.append(current_pos)
+                    self.current_speed = dist
                     if len(self.blade_pts) > self.max_points:
                         self.blade_pts.pop(0)
                 else:
-                    # Hand is stationary: decay old points so trail fades out
-                    if self.blade_pts:
-                        self.blade_pts.pop(0)
+                    self.current_speed = 0.0
         else:
             # Hand tracking lost: decay points
+            self.current_speed = 0.0
             if self.blade_pts:
                 self.blade_pts.pop(0)
 
     def get_speed(self):
-        if len(self.blade_pts) < 2:
-            return 0.0
-        p1 = self.blade_pts[-1]
-        p2 = self.blade_pts[-2]
-        return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+        return self.current_speed
 
     def get_tip(self):
         return self.blade_pts[-1] if self.blade_pts else None
@@ -73,9 +71,12 @@ class Blade:
     def check_collision(self, circle_x, circle_y, radius):
         if len(self.blade_pts) < 2:
             return False
-        p1 = self.blade_pts[-1]
-        p2 = self.blade_pts[-2]
-        return check_line_circle_collision(p1, p2, circle_x, circle_y, radius)
+        for index in range(len(self.blade_pts) - 1, 0, -1):
+            p1 = self.blade_pts[index]
+            p2 = self.blade_pts[index - 1]
+            if check_line_circle_collision(p1, p2, circle_x, circle_y, radius):
+                return True
+        return False
 
     def draw(self, surface):
         if len(self.blade_pts) < 2:

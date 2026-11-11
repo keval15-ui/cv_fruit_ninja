@@ -13,7 +13,11 @@ def main():
     clock = pygame.time.Clock()
 
     # Initialize Modules
-    tracker = HandTracker(WIDTH, HEIGHT, smooth_factor=0.6)
+    tracker = HandTracker(
+        WIDTH,
+        HEIGHT,
+        margin=0.08
+    )
     blade = Blade(max_points=12)
     scanner = CalibrationScanner(WIDTH, HEIGHT, target_radius=65, hold_duration=1.5)
     manager = GameManager(WIDTH, HEIGHT)
@@ -53,7 +57,7 @@ def main():
         # --- PHASE B: ACTIVE GAMEPLAY ---
         elif not manager.game_over:
             spawn_timer += 1
-            if spawn_timer > 40:
+            if spawn_timer > 60:
                 fruits.append(Fruit(WIDTH, HEIGHT))
                 spawn_timer = 0
 
@@ -65,7 +69,8 @@ def main():
 
                 # Slice collision check
                 if not fruit.sliced and blade_speed > 8:
-                    if blade.check_collision(fruit.x, fruit.y, fruit.radius):
+                    hit_radius = fruit.radius + (18 if not fruit.is_bomb else 8)
+                    if blade.check_collision(fruit.x, fruit.y, hit_radius):
                         halves, new_particles = fruit.slice()
                         sliced_halves.extend(halves)
                         particles.extend(new_particles)
