@@ -1,113 +1,122 @@
 import pygame
 from src.hand_tracker import HandTracker
-from src.fruit import Fruit
 from src.blade import Blade
-from src.calibration import CalibrationScanner
-from src.game_manager import GameManager
+from src.screens import (
+    LoadingScreen,
+    CalibrationScreen,
+    MenuScreen,
+    CustomizationScreen,
+    GameScreen
+)
 
 def main():
     pygame.init()
     WIDTH, HEIGHT = 1000, 700
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("CV Fruit Ninja - Finger Lock Edition")
+    pygame.display.set_caption("CV Fruit Ninja - Motion Edition")
     clock = pygame.time.Clock()
 
-    # Initialize Modules
-    tracker = HandTracker(
-        WIDTH,
-        HEIGHT,
-        margin=0.08
-    )
+    # Initialize Core Systems
+    tracker = HandTracker(WIDTH, HEIGHT, margin=0.08)
     blade = Blade(max_points=12)
-    scanner = CalibrationScanner(WIDTH, HEIGHT, target_radius=65, hold_duration=1.5)
-    manager = GameManager(WIDTH, HEIGHT)
 
-    fruits = []
-    sliced_halves = []
-    particles = []
-    spawn_timer = 0
+    # Initialize Screen Controllers
+    loading_screen = LoadingScreen(WIDTH, HEIGHT, duration=1.2)
+    calibration_screen = CalibrationScreen(WIDTH, HEIGHT, target_radius=65, hold_duration=1.5)
+    menu_screen = MenuScreen(WIDTH, HEIGHT)
+    customization_screen = CustomizationScreen(WIDTH, HEIGHT)
+    game_screen = GameScreen(WIDTH, HEIGHT)
+
+    # Initial Screen State
+    current_state = "loading"  # "loading" -> "calibration" -> "menu" -> ("game" | "customization")
 
     running = True
     while running:
         dt = clock.tick(60) / 1000.0  # Delta time in seconds
 
-        # 1. Event Handling
+        # 1. Fingertip Extraction
+        pos, _ = tracker.get_fingertip_position(show_preview=True)
+        blade.update(pos)
+        blade_speed = blade.get_speed()
+
+        # 2. Event Handling & State Machine Transitions
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            if event.type == pygame.KEYDOWN and manager.game_over:
-                if event.key == pygame.K_r:
-                    scanner.reset()
-                    manager.reset()
-                    fruits.clear()
-                    sliced_halves.clear()
-                    particles.clear()
 
-        # 2. Extract Fingertip Coordinate from Webcam
-        pos, _ = tracker.get_fingertip_position(show_preview=True)
-        blade.update(pos)
+            if current_state == "loading":
+                loading_screen.handle_event(event)
 
-        # 3. Clear Screen
-        screen.fill((15, 15, 25))
+            elif current_state == "calibration":
+                calibration_screen.handle_event(event)
 
-        # --- PHASE A: PRE-GAME CALIBRATION ---
-        if not scanner.is_complete:
-            scanner.update(pos, dt)
+            elif current_state == "menu":
+                action = menu_screen.handle_event(event)
+                if action == "start":
+                    game_screen.reset()
+                    current_state = "game"
+                elif action == "blade":
+                    current_state = "customization"
 
-        # --- PHASE B: ACTIVE GAMEPLAY ---
-        elif not manager.game_over:
-            spawn_timer += 1
-            if spawn_timer > 60:
-                fruits.append(Fruit(WIDTH, HEIGHT))
-                spawn_timer = 0
+            elif current_state == "customization":
+                action = customization_screen.handle_event(event)
+                if action == "back":
+                    outer, inner = customization_screen.get_selected_blade_colors()
+                    blade.set_palette(outer, inner)
+                    current_state = "menu"
 
-            blade_speed = blade.get_speed()
+            elif current_state == "game":
+                action = game_screen.handle_event(event)
+                if action == "menu":
+                    current_state = "menu"
 
-            for fruit in fruits[:]:
-                fruit.update()
-                fruit.draw(screen)
+        # 3. State Updates
+        if current_state == "loading":
+            loading_screen.update(dt)
+            if loading_screen.is_finished:
+                current_state = "calibration"
 
-                # Slice collision check
-                if not fruit.sliced and blade_speed > 8:
-                    hit_radius = fruit.radius + (18 if not fruit.is_bomb else 8)
-                    if blade.check_collision(fruit.x, fruit.y, hit_radius):
-                        halves, new_particles = fruit.slice()
-                        sliced_halves.extend(halves)
-                        particles.extend(new_particles)
+        elif current_state == "calibration":
+            if calibration_screen.update(pos, dt):
+                current_state = "menu"
 
-                        if fruit.is_bomb:
-                            manager.game_over = True
-                        else:
-                            manager.add_score(10, fruit.x, fruit.y)
-                            manager.add_stain(fruit.x, fruit.y, fruit.juice_color)
+        elif current_state == "menu":
+            action = menu_screen.update(pos, blade_speed, dt)
+            if action == "start":
+                game_screen.reset()
+                current_state = "game"
+            elif action == "blade":
+                current_state = "customization"
 
-                        fruits.remove(fruit)
-                        continue
+        elif current_state == "customization":
+            action = customization_screen.update(pos, blade_speed, dt)
+            if action == "back":
+                outer, inner = customization_screen.get_selected_blade_colors()
+                blade.set_palette(outer, inner)
+                current_state = "menu"
 
-                # Missed fruit check
-                if fruit.y > HEIGHT + 60:
-                    if not fruit.sliced and not fruit.is_bomb:
-                        manager.lose_life()
-                    fruits.remove(fruit)
+        elif current_state == "game":
+            game_screen.update(blade)
 
-        # 4. Render Flying Halves & Particles
-        for half in sliced_halves[:]:
-            half.update()
-            half.draw(screen)
-            if half.y > HEIGHT + 80:
-                sliced_halves.remove(half)
+        # 4. Rendering
+        if current_state == "loading":
+            loading_screen.draw(screen)
 
-        for p in particles[:]:
-            p.update()
-            p.draw(screen)
-            if not p.is_alive():
-                particles.remove(p)
+        elif current_state == "calibration":
+            calibration_screen.draw(screen)
 
-        # 5. Render Blade Trail, UI, & Scanner Overlay
-        blade.draw(screen)
-        manager.update()
-        manager.draw_ui(screen)
-        scanner.draw(screen)  # Overlays the target scanner until complete
+        elif current_state == "menu":
+            menu_screen.draw(screen)
+
+        elif current_state == "customization":
+            customization_screen.draw(screen)
+
+        elif current_state == "game":
+            game_screen.draw(screen)
+
+        # Draw glowing blade trail across screens (except initial loading screen)
+        if current_state != "loading":
+            blade.draw(screen)
 
         pygame.display.flip()
 

@@ -1,23 +1,37 @@
 import pygame
 import math
+import os
 
-class CalibrationScanner:
+class CalibrationScreen:
     """
-    Dedicated module for pre-game Index Finger Calibration.
+    Dedicated screen for pre-game Index Finger Calibration.
     Locks user tracking, verifies camera reach and lighting,
-    and displays an interactive hold-to-confirm progress target ring.
+    and displays an interactive hold-to-confirm progress target ring
+    with calibration.jpg as the background.
     """
     def __init__(self, screen_width, screen_height, target_radius=65, hold_duration=1.5):
         self.width = screen_width
         self.height = screen_height
         self.target_center = (screen_width // 2, screen_height // 2)
         self.target_radius = target_radius
-        self.hold_duration = hold_duration  # Seconds required to hold still
+        self.hold_duration = hold_duration
         self.timer = 0.0
         self.is_complete = False
 
         self.title_font = pygame.font.SysFont("Arial", 44, bold=True)
         self.sub_font = pygame.font.SysFont("Arial", 22)
+
+        # Load calibration background image
+        self.bg_image = None
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        bg_path = os.path.join(base_dir, "assets", "images", "calibration.jpg")
+        if os.path.exists(bg_path):
+            try:
+                loaded_bg = pygame.image.load(bg_path).convert()
+                self.bg_image = pygame.transform.smoothscale(loaded_bg, (screen_width, screen_height))
+            except Exception as e:
+                print(f"[Warning] Failed to load calibration background image: {e}")
+                self.bg_image = None
 
     def update(self, pos, dt):
         """
@@ -43,18 +57,25 @@ class CalibrationScanner:
         return False
 
     def reset(self):
-        """Resets calibration state for game restarts."""
+        """Resets calibration state."""
         self.timer = 0.0
         self.is_complete = False
 
-    def draw(self, surface):
-        """Draws the dark overlay screen and target progress ring."""
-        if self.is_complete:
-            return
+    def handle_event(self, event):
+        # Allow pressing Space or Enter to skip calibration if user prefers
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_SPACE, pygame.K_RETURN):
+            self.is_complete = True
 
-        # Semi-transparent dark overlay
+    def draw(self, surface):
+        """Draws the calibration background, dark overlay, and target progress ring."""
+        if self.bg_image:
+            surface.blit(self.bg_image, (0, 0))
+        else:
+            surface.fill((15, 15, 25))
+
+        # Semi-transparent dark overlay for high contrast and readability
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        overlay.fill((10, 10, 20, 190))
+        overlay.fill((10, 10, 20, 140))
         surface.blit(overlay, (0, 0))
 
         # Title & Instructions
@@ -83,3 +104,7 @@ class CalibrationScanner:
         status_txt = "HOLD STILL" if progress > 0 else "POINT HERE"
         txt_surf = self.sub_font.render(status_txt, True, (255, 255, 255))
         surface.blit(txt_surf, (cx - txt_surf.get_width() // 2, cy - txt_surf.get_height() // 2))
+
+        # Skip hint
+        hint_surf = self.sub_font.render("(Press SPACE or ENTER to skip)", True, (150, 150, 170))
+        surface.blit(hint_surf, (self.width // 2 - hint_surf.get_width() // 2, self.height - 50))

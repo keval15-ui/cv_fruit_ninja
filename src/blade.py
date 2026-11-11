@@ -36,6 +36,11 @@ class Blade:
         self.min_movement_dist = 3
         self.current_speed = 0.0
 
+    def set_palette(self, outer_color, inner_color):
+        """Updates the blade glowing color theme."""
+        self.outer_color = outer_color
+        self.inner_color = inner_color
+
     def update(self, current_pos):
         """
         Appends new position only when moving beyond deadzone threshold.
