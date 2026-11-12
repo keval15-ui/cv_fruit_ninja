@@ -1,6 +1,16 @@
+import os
 import pygame
 import random
 from src.fruit import Fruit
+
+# ---------------------------------------------------------------------------
+# Asset path helper
+# ---------------------------------------------------------------------------
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def _asset(*parts):
+    return os.path.join(_BASE_DIR, "assets", "images", *parts)
+
 
 class FloatingText:
     """Renders floating score popups (+10, COMBO!) that drift upward and fade out."""
@@ -30,7 +40,8 @@ class FloatingText:
 class GameScreen:
     """
     Main active Fruit Ninja gameplay screen.
-    Handles fruit spawner, collision checks, particles, halves, scores, and lives.
+    Handles fruit spawner, collision checks, particles, halves, scores, lives,
+    countdown timer, background image, and heart-image HUD.
     """
     def __init__(self, width, height):
         self.width = width
@@ -39,11 +50,15 @@ class GameScreen:
         self.score = 0
         self.lives = 5
         self.game_over = False
+        self.time_remaining = 120.0  # 2-minute countdown
 
+        # Fonts
         self.font = pygame.font.SysFont("Arial", 32, bold=True)
         self.title_font = pygame.font.SysFont("Arial", 48, bold=True)
         self.sub_font = pygame.font.SysFont("Arial", 20)
+        self.timer_font = pygame.font.SysFont("Arial", 36, bold=True)
 
+        # Game object lists
         self.fruits = []
         self.sliced_halves = []
         self.particles = []
@@ -52,10 +67,33 @@ class GameScreen:
 
         self.spawn_timer = 0
 
+        # --- Background image ---
+        try:
+            bg_raw = pygame.image.load(_asset("background-game.jpg")).convert()
+            self.bg_image = pygame.transform.scale(bg_raw, (width, height))
+        except Exception:
+            self.bg_image = None  # fallback: solid fill
+
+        # --- Heart images ---
+        try:
+            heart_raw = pygame.image.load(_asset("heart.jpg")).convert_alpha()
+            self.heart_img = pygame.transform.smoothscale(heart_raw, (36, 36))
+        except Exception:
+            # Fallback: red circle surface
+            self.heart_img = pygame.Surface((36, 36), pygame.SRCALPHA)
+            pygame.draw.circle(self.heart_img, (220, 30, 30), (18, 18), 16)
+
+        # Empty heart placeholder (dark red circle)
+        self.heart_empty = pygame.Surface((36, 36), pygame.SRCALPHA)
+        pygame.draw.circle(self.heart_empty, (60, 20, 20, 180), (18, 18), 16)
+        pygame.draw.circle(self.heart_empty, (100, 40, 40, 200), (18, 18), 16, 2)
+
+    # ------------------------------------------------------------------
     def reset(self):
         self.score = 0
         self.lives = 5
         self.game_over = False
+        self.time_remaining = 120.0
         self.fruits.clear()
         self.sliced_halves.clear()
         self.particles.clear()
@@ -63,6 +101,7 @@ class GameScreen:
         self.bg_stains_surface.fill((0, 0, 0, 0))
         self.spawn_timer = 0
 
+    # ------------------------------------------------------------------
     def add_score(self, amount, x, y, label=None):
         self.score += amount
         txt = label if label else f"+{amount}"
@@ -71,6 +110,7 @@ class GameScreen:
     def lose_life(self):
         self.lives -= 1
         if self.lives <= 0:
+            self.lives = 0
             self.game_over = True
 
     def add_stain(self, x, y, color):
@@ -80,6 +120,7 @@ class GameScreen:
         pygame.draw.circle(stain_surf, (r, g, b, 50), (radius, radius), radius)
         self.bg_stains_surface.blit(stain_surf, (x - radius, y - radius))
 
+    # ------------------------------------------------------------------
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
@@ -88,9 +129,16 @@ class GameScreen:
                 self.reset()
         return None
 
-    def update(self, blade):
+    # ------------------------------------------------------------------
+    def update(self, blade, dt):
         """Updates game state, handles fruit physics and blade slicing."""
         if not self.game_over:
+            # Countdown timer
+            self.time_remaining -= dt
+            if self.time_remaining <= 0:
+                self.time_remaining = 0
+                self.game_over = True
+
             # Fruit Spawning
             self.spawn_timer += 1
             if self.spawn_timer > 55:
@@ -145,8 +193,56 @@ class GameScreen:
 
         return None
 
+    # ------------------------------------------------------------------
+    def _draw_hearts(self, surface):
+        """Draw heart HUD in top-right corner."""
+        spacing = 42
+        total_hearts = 5
+        start_x = self.width - 40 - (total_hearts * spacing)
+        y = 22
+        for i in range(total_hearts):
+            x = start_x + i * spacing
+            if i < self.lives:
+                surface.blit(self.heart_img, (x, y))
+            else:
+                surface.blit(self.heart_empty, (x, y))
+
+    def _draw_timer(self, surface):
+        """Draw countdown timer in top-center with styled background box."""
+        mins = int(self.time_remaining) // 60
+        secs = int(self.time_remaining) % 60
+        timer_str = f"{mins}:{secs:02d}"
+
+        # Flashing red when < 20s
+        if self.time_remaining < 20:
+            flash = int(self.time_remaining * 2) % 2
+            color = (255, 50, 50) if flash else (255, 180, 180)
+        else:
+            color = (255, 255, 255)
+
+        timer_surf = self.timer_font.render(timer_str, True, color)
+        tw, th = timer_surf.get_size()
+        cx = self.width // 2
+        box_w = tw + 28
+        box_h = th + 12
+        box_x = cx - box_w // 2
+        box_y = 14
+
+        # Dark semi-transparent rounded rect behind timer
+        box_surf = pygame.Surface((box_w, box_h), pygame.SRCALPHA)
+        box_surf.fill((0, 0, 0, 0))
+        pygame.draw.rect(box_surf, (10, 10, 20, 170), (0, 0, box_w, box_h), border_radius=12)
+        surface.blit(box_surf, (box_x, box_y))
+
+        surface.blit(timer_surf, (cx - tw // 2, box_y + 6))
+
+    # ------------------------------------------------------------------
     def draw(self, surface):
-        surface.fill((15, 15, 25))
+        # Background image (or solid fallback)
+        if self.bg_image:
+            surface.blit(self.bg_image, (0, 0))
+        else:
+            surface.fill((15, 15, 25))
 
         # Juice stains on wall
         surface.blit(self.bg_stains_surface, (0, 0))
@@ -168,20 +264,32 @@ class GameScreen:
 
         # HUD Overlay
         if not self.game_over:
+            # Score — top left
             score_surf = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
-            lives_surf = self.font.render(f"Lives: {'X ' * max(0, self.lives)}", True, (255, 50, 50))
-            esc_hint = self.sub_font.render("[ESC] Menu", True, (130, 140, 160))
             surface.blit(score_surf, (25, 20))
-            surface.blit(lives_surf, (self.width - 220, 20))
-            surface.blit(esc_hint, (25, 65))
+
+            # Timer — top center
+            self._draw_timer(surface)
+
+            # Hearts — top right
+            self._draw_hearts(surface)
+
         else:
             overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
             overlay.fill((10, 10, 15, 180))
             surface.blit(overlay, (0, 0))
 
-            over_surf = self.title_font.render("GAME OVER", True, (255, 50, 50))
-            restart_surf = self.font.render("Press 'R' to Restart   |   [ESC] Main Menu", True, (255, 255, 255))
+            # Determine game-over variant
+            if self.time_remaining <= 0:
+                over_text = "TIME'S UP!"
+                over_color = (255, 220, 0)
+            else:
+                over_text = "GAME OVER"
+                over_color = (255, 50, 50)
+
+            over_surf = self.title_font.render(over_text, True, over_color)
             final_score = self.font.render(f"Final Score: {self.score}", True, (255, 215, 0))
+            restart_surf = self.font.render("Press 'R' to Restart   |   [ESC] Main Menu", True, (255, 255, 255))
 
             surface.blit(over_surf, (self.width // 2 - over_surf.get_width() // 2, self.height // 2 - 70))
             surface.blit(final_score, (self.width // 2 - final_score.get_width() // 2, self.height // 2 - 10))

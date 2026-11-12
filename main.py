@@ -96,7 +96,7 @@ def main():
                 current_state = "menu"
 
         elif current_state == "game":
-            game_screen.update(blade)
+            game_screen.update(blade, dt)
 
         # 4. Rendering
         if current_state == "loading":
