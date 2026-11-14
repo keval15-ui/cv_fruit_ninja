@@ -22,7 +22,7 @@ class LoadingScreen:
         if os.path.exists(bg_path):
             try:
                 raw_bg = pygame.image.load(bg_path).convert()
-                self.bg_image = pygame.transform.smoothscale(raw_bg, (width, height))
+                self.bg_image = pygame.transform.scale(raw_bg, (width, height))
             except Exception as e:
                 print(f"[Warning] Failed to load loading background: {e}")
 
@@ -46,13 +46,8 @@ class LoadingScreen:
         else:
             surface.fill((15, 15, 25))
 
-        # Soft overlay
-        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        overlay.fill((10, 10, 20, 150))
-        surface.blit(overlay, (0, 0))
-
         # Title
-        title_surf = self.title_font.render("CV FRUIT NINJA", True, (0, 240, 255))
+        title_surf = self.title_font.render("CV FRUIT NINJA", True, (235, 170, 35))
         surface.blit(title_surf, (self.width // 2 - title_surf.get_width() // 2, self.height // 2 - 90))
 
         # Progress bar
@@ -65,8 +60,8 @@ class LoadingScreen:
         pygame.draw.rect(surface, (40, 40, 60), (bar_x, bar_y, bar_w, bar_h), border_radius=8)
         if ratio > 0:
             fill_w = int(bar_w * ratio)
-            pygame.draw.rect(surface, (0, 240, 255), (bar_x, bar_y, fill_w, bar_h), border_radius=8)
-        pygame.draw.rect(surface, (100, 200, 255), (bar_x, bar_y, bar_w, bar_h), 2, border_radius=8)
+            pygame.draw.rect(surface, (235, 75, 45), (bar_x, bar_y, fill_w, bar_h), border_radius=8)
+        pygame.draw.rect(surface, (30, 125, 225), (bar_x, bar_y, bar_w, bar_h), 2, border_radius=8)
 
         status_text = "INITIALIZING SENSORS & SYSTEM..." if ratio < 0.95 else "READY!"
         sub_surf = self.sub_font.render(status_text, True, (220, 220, 220))

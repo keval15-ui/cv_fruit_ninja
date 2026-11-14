@@ -17,10 +17,10 @@ class AmbientOrb:
         self.speed = random.uniform(20, 50)
         self.angle = random.uniform(0, math.pi * 2)
         self.color = random.choice([
-            (0, 240, 255),
-            (255, 170, 0),
-            (255, 75, 130),
-            (0, 255, 180)
+            (30, 125, 225),
+            (235, 170, 35),
+            (235, 75, 45),
+            (70, 165, 75)
         ])
         self.alpha = random.randint(60, 160)
 
@@ -46,7 +46,7 @@ class CircleMenuButton:
     - Slice-through detection & hold-to-confirm radial progress arc
     - Mouse click & CV finger tracking support
     """
-    def __init__(self, action_id, title, subtitle, cx, cy, radius=95, theme_color=(0, 240, 255), badge=""):
+    def __init__(self, action_id, title, subtitle, cx, cy, radius=95, theme_color=(30, 125, 225), badge=""):
         self.action_id = action_id
         self.title = title
         self.subtitle = subtitle
@@ -138,13 +138,13 @@ class CircleMenuButton:
             arc_rect = pygame.Rect(cx - r - 6, cy - r - 6, (r + 6) * 2, (r + 6) * 2)
             angle_span = self.hover_progress * (math.pi * 2)
             # Pygame arc draws counterclockwise from 0 (3 o'clock)
-            pygame.draw.arc(surface, (0, 255, 200), arc_rect, -math.pi / 2, -math.pi / 2 + angle_span, 5)
+            pygame.draw.arc(surface, self.theme_color, arc_rect, -math.pi / 2, -math.pi / 2 + angle_span, 5)
 
         # 6. Button Text & Subtitle
         t_surf = title_font.render(self.title, True, (255, 255, 255))
         surface.blit(t_surf, (cx - t_surf.get_width() // 2, cy - t_surf.get_height() // 2 - 12))
 
-        sub_col = (0, 255, 200) if self.is_hovered else (200, 220, 240)
+        sub_col = self.theme_color if self.is_hovered else (220, 215, 195)
         s_surf = sub_font.render(self.subtitle, True, sub_col)
         surface.blit(s_surf, (cx - s_surf.get_width() // 2, cy + 14))
 
@@ -169,7 +169,6 @@ class MenuScreen:
     Features:
     - Circular interactive target buttons for START, BLADE, MULTIPLAYER
     - Ambient glowing particles
-    - Cinematic title with neon glows
     - background-landing.jpg backdrop
     """
     def __init__(self, width, height):
@@ -192,7 +191,7 @@ class MenuScreen:
         if os.path.exists(bg_path):
             try:
                 raw_bg = pygame.image.load(bg_path).convert()
-                self.bg_image = pygame.transform.smoothscale(raw_bg, (width, height))
+                self.bg_image = pygame.transform.scale(raw_bg, (width, height))
             except Exception as e:
                 print(f"[Warning] Failed to load landing background: {e}")
 
@@ -203,9 +202,9 @@ class MenuScreen:
         center_x = width // 2
 
         self.buttons = [
-            CircleMenuButton("start", "START", "CLASSIC SOLO", center_x - spacing, cy, radius=btn_radius, theme_color=(0, 240, 255)),
-            CircleMenuButton("blade", "BLADE", "CUSTOMIZE", center_x, cy, radius=btn_radius, theme_color=(255, 175, 0)),
-            CircleMenuButton("multiplayer", "VS MODE", "MULTIPLAYER", center_x + spacing, cy, radius=btn_radius, theme_color=(255, 65, 130), badge="2-PLAYER")
+            CircleMenuButton("start", "START", "CLASSIC SOLO", center_x - spacing, cy, radius=btn_radius, theme_color=(30, 125, 225)),
+            CircleMenuButton("blade", "BLADE", "CUSTOMIZE", center_x, cy, radius=btn_radius, theme_color=(235, 75, 45)),
+            CircleMenuButton("multiplayer", "VS MODE", "MULTIPLAYER", center_x + spacing, cy, radius=btn_radius, theme_color=(235, 170, 35), badge="2-PLAYER")
         ]
 
         self.info_modal = None
@@ -261,40 +260,19 @@ class MenuScreen:
         else:
             surface.fill((16, 18, 28))
 
-        # 2. Modern dark vignette overlay
-        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        overlay.fill((8, 12, 22, 140))
-        surface.blit(overlay, (0, 0))
-
-        # 3. Ambient Orbs
+        # 2. Ambient Orbs
         for orb in self.orbs:
             orb.draw(surface)
 
-        # 4. Cinematic Title Section
-        title_y = 100
-        # Glow layer
-        glow_surf = self.title_font.render("CV FRUIT NINJA", True, (0, 200, 255))
-        glow_blur = pygame.transform.smoothscale(glow_surf, (glow_surf.get_width() + 4, glow_surf.get_height() + 4))
-        surface.blit(glow_blur, (self.width // 2 - glow_blur.get_width() // 2, title_y - 2))
-
-        # Main text
-        title_surf = self.title_font.render("CV FRUIT NINJA", True, (255, 255, 255))
-        surface.blit(title_surf, (self.width // 2 - title_surf.get_width() // 2, title_y))
-
-        # Subtitle badge banner
-        banner_txt = "MOTION DETECTION EDITION  •  SLICE TO SELECT"
-        sub_banner = self.btn_sub_font.render(banner_txt, True, (0, 240, 255))
-        surface.blit(sub_banner, (self.width // 2 - sub_banner.get_width() // 2, title_y + 70))
-
-        # 5. Circular Buttons
+        # 3. Circular Buttons
         for btn in self.buttons:
             btn.draw(surface, self.btn_title_font, self.btn_sub_font, self.small_font)
 
-        # 6. Bottom Navigation Hint
+        # 4. Bottom Navigation Hint
         foot_txt = self.small_font.render("Use your index finger to slice any circle  |  Keys: [1] Start  [2] Blade  [3] Multiplayer", True, (160, 175, 195))
         surface.blit(foot_txt, (self.width // 2 - foot_txt.get_width() // 2, self.height - 35))
 
-        # 7. Modal
+        # 5. Modal
         if self.info_modal:
             modal_rect = pygame.Rect(self.width // 2 - 270, self.height // 2 - 80, 540, 160)
             modal_surf = pygame.Surface((modal_rect.width, modal_rect.height), pygame.SRCALPHA)
