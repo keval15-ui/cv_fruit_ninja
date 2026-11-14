@@ -147,7 +147,7 @@ class HandTracker:
 
         if show_preview and frame is not None:
             # Resize preview to a compact PIP size (e.g., 240x180) so it doesn't obstruct the screen
-            small_preview = cv2.resize(frame, (240, 180), interpolation=cv2.INTER_LINEAR)
+            small_preview = cv2.resize(frame, (480, 360), interpolation=cv2.INTER_LINEAR)
             cv2.imshow("Hand Tracker Debug Preview", small_preview)
             cv2.waitKey(1)
 
