@@ -419,7 +419,7 @@ class FruitHalf:
 
 class Fruit:
     """
-    Spawns fruits or Bombs (8% chance).
+    Spawns fruits or Bombs (30% chance).
     Handles physics, rotation and slice splitting.
     """
 
@@ -427,7 +427,7 @@ class Fruit:
         self.screen_width = screen_width
         self.screen_height = screen_height
 
-        self.is_bomb = random.random() < 0.08
+        self.is_bomb = random.random() < 0.30
 
         if self.is_bomb:
             self.type = 'bomb'

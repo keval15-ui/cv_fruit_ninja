@@ -69,10 +69,32 @@ class GameScreen:
 
         # --- Background image ---
         try:
-            bg_raw = pygame.image.load(_asset("background-game.jpg")).convert()
+            bg_raw = pygame.image.load(_asset("background-game.png")).convert()
             self.bg_image = pygame.transform.scale(bg_raw, (width, height))
         except Exception:
             self.bg_image = None  # fallback: solid fill
+
+        # --- Slice sound ---
+        try:
+            self.slice_sound = pygame.mixer.Sound(
+                os.path.join(_BASE_DIR, "assets", "sounds", "blade.wav")
+            )
+        except pygame.error as error:
+            self.slice_sound = None
+            print(f"[Warning] Failed to load slice sound: {error}")
+
+        try:
+            self.bomb_fuse_sound = pygame.mixer.Sound(
+                os.path.join(_BASE_DIR, "assets", "sounds", "Bomb-Fuse.wav")
+            )
+            self.bomb_explode_sound = pygame.mixer.Sound(
+                os.path.join(_BASE_DIR, "assets", "sounds", "Bomb-explode.wav")
+            )
+        except pygame.error as error:
+            self.bomb_fuse_sound = None
+            self.bomb_explode_sound = None
+            print(f"[Warning] Failed to load bomb sounds: {error}")
+        self.bomb_fuse_channel = None
 
         # --- Heart images ---
         try:
@@ -90,6 +112,9 @@ class GameScreen:
 
     # ------------------------------------------------------------------
     def reset(self):
+        if self.bomb_fuse_channel:
+            self.bomb_fuse_channel.stop()
+            self.bomb_fuse_channel = None
         self.score = 0
         self.lives = 5
         self.game_over = False
@@ -142,7 +167,12 @@ class GameScreen:
             # Fruit Spawning
             self.spawn_timer += 1
             if self.spawn_timer > 55:
-                self.fruits.append(Fruit(self.width, self.height))
+                fruit = Fruit(self.width, self.height)
+                self.fruits.append(fruit)
+                if fruit.is_bomb and self.bomb_fuse_sound:
+                    if self.bomb_fuse_channel:
+                        self.bomb_fuse_channel.stop()
+                    self.bomb_fuse_channel = self.bomb_fuse_sound.play()
                 self.spawn_timer = 0
 
             blade_speed = blade.get_speed()
@@ -157,6 +187,14 @@ class GameScreen:
                         halves, new_particles = fruit.slice()
                         self.sliced_halves.extend(halves)
                         self.particles.extend(new_particles)
+                        if fruit.is_bomb:
+                            if self.bomb_fuse_channel:
+                                self.bomb_fuse_channel.stop()
+                                self.bomb_fuse_channel = None
+                            if self.bomb_explode_sound:
+                                self.bomb_explode_sound.play()
+                        elif self.slice_sound:
+                            self.slice_sound.play()
 
                         if fruit.is_bomb:
                             self.game_over = True
@@ -171,6 +209,9 @@ class GameScreen:
                 if fruit.y > self.height + 60:
                     if not fruit.sliced and not fruit.is_bomb:
                         self.lose_life()
+                    if fruit.is_bomb and self.bomb_fuse_channel:
+                        self.bomb_fuse_channel.stop()
+                        self.bomb_fuse_channel = None
                     self.fruits.remove(fruit)
 
         # Update flying halves
