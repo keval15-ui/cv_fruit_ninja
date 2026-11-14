@@ -1,4 +1,5 @@
 import os
+import math
 import pygame
 import random
 from src.fruit import Fruit
@@ -50,7 +51,7 @@ class GameScreen:
         self.score = 0
         self.lives = 5
         self.game_over = False
-        self.time_remaining = 120.0  # 2-minute countdown
+        self.time_remaining = 30.0  # 30-second countdown
 
         # Fonts
         self.font = pygame.font.SysFont("Arial", 32, bold=True)
@@ -110,21 +111,58 @@ class GameScreen:
         pygame.draw.circle(self.heart_empty, (60, 20, 20, 180), (18, 18), 16)
         pygame.draw.circle(self.heart_empty, (100, 40, 40, 200), (18, 18), 16, 2)
 
+        # --- Time up sound ---
+        try:
+            self.time_up_sound = pygame.mixer.Sound(
+                os.path.join(_BASE_DIR, "assets", "sounds", "time-up.wav")
+            )
+        except pygame.error as error:
+            self.time_up_sound = None
+            print(f"[Warning] Failed to load time-up sound: {error}")
+
+        # --- Game start and game over sounds ---
+        try:
+            self.game_start_sound = pygame.mixer.Sound(
+                os.path.join(_BASE_DIR, "assets", "sounds", "Game-start.wav")
+            )
+            self.game_over_sound = pygame.mixer.Sound(
+                os.path.join(_BASE_DIR, "assets", "sounds", "Game-over.wav")
+            )
+        except pygame.error as error:
+            self.game_start_sound = None
+            self.game_over_sound = None
+            print(f"[Warning] Failed to load game sounds: {error}")
+
+        self.game_start_channel = None
+        self.time_up_channel = None
+        self.game_over_sound_played = False
+        self.game_started = False
+        self.start_countdown = 0.0
+
     # ------------------------------------------------------------------
     def reset(self):
+        if self.game_start_channel:
+            self.game_start_channel.stop()
+            self.game_start_channel = None
         if self.bomb_fuse_channel:
             self.bomb_fuse_channel.stop()
             self.bomb_fuse_channel = None
+        if self.time_up_channel:
+            self.time_up_channel.stop()
+            self.time_up_channel = None
         self.score = 0
         self.lives = 5
         self.game_over = False
-        self.time_remaining = 120.0
+        self.time_remaining = 30.0
         self.fruits.clear()
         self.sliced_halves.clear()
         self.particles.clear()
         self.floating_texts.clear()
         self.bg_stains_surface.fill((0, 0, 0, 0))
         self.spawn_timer = 0
+        self.start_countdown = 5.0
+        if self.game_start_sound:
+            self.game_start_channel = self.game_start_sound.play()
 
     # ------------------------------------------------------------------
     def add_score(self, amount, x, y, label=None):
@@ -157,12 +195,30 @@ class GameScreen:
     # ------------------------------------------------------------------
     def update(self, blade, dt):
         """Updates game state, handles fruit physics and blade slicing."""
+        if not self.game_started:
+            self.start_countdown = max(0.0, self.start_countdown - dt)
+            if self.start_countdown <= 0:
+                self.game_started = True
+            else:
+                return None
+
         if not self.game_over:
             # Countdown timer
             self.time_remaining -= dt
             if self.time_remaining <= 0:
                 self.time_remaining = 0
                 self.game_over = True
+
+                if self.game_over_sound and not self.game_over_sound_played:
+                    if self.time_up_sound:
+                        self.time_up_channel = self.time_up_sound.play()
+                        if self.time_up_channel:
+                            self.time_up_channel.queue(self.game_over_sound)
+                        else:
+                            self.game_over_sound.play()
+                    else:
+                        self.game_over_sound.play()
+                    self.game_over_sound_played = True
 
             # Fruit Spawning
             self.spawn_timer += 1
@@ -231,6 +287,15 @@ class GameScreen:
             ft.update()
             if not ft.is_alive():
                 self.floating_texts.remove(ft)
+
+        if not self.game_started:
+            if (
+                self.game_start_channel is None
+                or not self.game_start_channel.get_busy()
+            ):
+                self.game_started = True
+            else:
+                return None
 
         return None
 
@@ -305,6 +370,17 @@ class GameScreen:
 
         # HUD Overlay
         if not self.game_over:
+            if not self.game_started:
+                countdown = max(1, math.ceil(self.start_countdown))
+                countdown_surf = self.title_font.render(str(countdown), True, (255, 220, 80))
+                surface.blit(
+                    countdown_surf,
+                    (
+                        self.width // 2 - countdown_surf.get_width() // 2,
+                        self.height // 2 - countdown_surf.get_height() // 2,
+                    ),
+                )
+
             # Score — top left
             score_surf = self.font.render(f"Score: {self.score}", True, (255, 255, 255))
             surface.blit(score_surf, (25, 20))
