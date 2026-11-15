@@ -23,14 +23,6 @@ TYPES = {
         'vy_range':    (-14, -12),
         'weight':      1,
     },
-    'mango': {
-        'color':       (240, 185, 30),
-        'inner':       (255, 235, 130),
-        'juice_color': (240, 140, 20),
-        'radius':      38,
-        'vy_range':    (-18, -15),
-        'weight':      2,
-    },
     'apple': {
         'color':       (210, 25, 25),
         'inner':       (245, 240, 200),
@@ -47,11 +39,27 @@ TYPES = {
         'vy_range':    (-18, -15),
         'weight':      3,
     },
-    'guava': {
-        'color':       (185, 215, 110),
-        'inner':       (240, 140, 160),
-        'juice_color': (230, 110, 150),
-        'radius':      35,
+    'coconut': {
+        'color':       (105, 65, 35),
+        'inner':       (245, 240, 215),
+        'juice_color': (220, 205, 170),
+        'radius':      36,
+        'vy_range':    (-18, -15),
+        'weight':      2,
+    },
+    'kiwifruit': {
+        'color':       (115, 75, 45),
+        'inner':       (135, 190, 65),
+        'juice_color': (100, 175, 45),
+        'radius':      34,
+        'vy_range':    (-18, -15),
+        'weight':      2,
+    },
+    'pineapple': {
+        'color':       (205, 155, 35),
+        'inner':       (250, 205, 75),
+        'juice_color': (235, 175, 35),
+        'radius':      40,
         'vy_range':    (-18, -15),
         'weight':      2,
     },
@@ -63,12 +71,20 @@ TYPES = {
         'vy_range':    (-18, -15),
         'weight':      2,
     },
-    'cherry': {
-        'color':       (170, 15, 30),
-        'inner':       (240, 160, 170),
-        'juice_color': (160, 10, 25),
-        'radius':      22,
-        'vy_range':    (-22, -18),
+    'plum': {
+        'color':       (95, 35, 125),
+        'inner':       (245, 145, 165),
+        'juice_color': (155, 55, 125),
+        'radius':      32,
+        'vy_range':    (-18, -15),
+        'weight':      2,
+    },
+    'strawberry': {
+        'color':       (210, 35, 45),
+        'inner':       (245, 85, 95),
+        'juice_color': (225, 35, 55),
+        'radius':      30,
+        'vy_range':    (-18, -15),
         'weight':      3,
     },
 }
@@ -128,21 +144,6 @@ def _draw_whole_fruit(surf: pygame.Surface, cx: int, cy: int,
         # Dark border ring
         pygame.draw.circle(surf, (20, 100, 25), (cx, cy), radius, 3)
 
-    elif fruit_type == 'mango':
-        # Golden-yellow base
-        pygame.draw.circle(surf, (240, 185, 30), (cx, cy), radius)
-        # Orange blush on one side
-        blush_surf = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-        for r_step in range(radius, 0, -4):
-            alpha = int(80 * (1 - r_step / radius))
-            pygame.draw.circle(blush_surf, (255, 110, 10, alpha),
-                               (radius + radius // 3, radius - radius // 4), r_step)
-        surf.blit(blush_surf, (cx - radius, cy - radius))
-        # Highlight
-        pygame.draw.ellipse(surf, (255, 235, 140),
-                            (cx - radius // 2, cy - radius // 2,
-                             radius // 2, radius // 3))
-
     elif fruit_type == 'apple':
         # Vivid red body
         pygame.draw.circle(surf, (210, 25, 25), (cx, cy), radius)
@@ -183,18 +184,67 @@ def _draw_whole_fruit(surf: pygame.Surface, cx: int, cy: int,
                             (cx - radius // 2, cy - radius // 2,
                              radius // 2, radius // 3))
 
-    elif fruit_type == 'guava':
-        # Pale yellow-green base
-        pygame.draw.circle(surf, (185, 215, 110), (cx, cy), radius)
-        # Slightly darker green ring
-        pygame.draw.circle(surf, (155, 190, 85), (cx, cy), radius, 3)
-        # Highlight
-        pygame.draw.ellipse(surf, (220, 240, 160),
+    elif fruit_type == 'coconut':
+        # Fibrous brown shell with a natural oval silhouette.
+        shell_rect = pygame.Rect(cx - radius, cy - int(radius * 0.82),
+                                 radius * 2, int(radius * 1.64))
+        pygame.draw.ellipse(surf, (85, 48, 25), shell_rect)
+        pygame.draw.ellipse(surf, (135, 85, 45),
+                            (shell_rect.x + 4, shell_rect.y + 4,
+                             shell_rect.width - 8, shell_rect.height - 8), 3)
+        for offset in range(-radius // 2, radius // 2, 7):
+            pygame.draw.line(surf, (165, 105, 55),
+                             (cx + offset, cy - radius // 2),
+                             (cx + offset // 2, cy + radius // 2), 2)
+        pygame.draw.ellipse(surf, (215, 170, 105),
                             (cx - radius // 2, cy - radius // 2,
-                             radius // 2, radius // 3))
-        # Small nub at bottom (guava tip)
-        pygame.draw.circle(surf, (140, 175, 75),
-                           (cx, cy + radius - 6), 5)
+                             radius // 2, radius // 4))
+
+    elif fruit_type == 'kiwifruit':
+        # Fuzzy brown skin and an oblong form.
+        fruit_rect = pygame.Rect(cx - radius, cy - int(radius * 0.82),
+                                 radius * 2, int(radius * 1.64))
+        pygame.draw.ellipse(surf, (105, 70, 42), fruit_rect)
+        pygame.draw.ellipse(surf, (155, 110, 70),
+                            (fruit_rect.x + 3, fruit_rect.y + 3,
+                             fruit_rect.width - 6, fruit_rect.height - 6), 2)
+        for angle in range(0, 360, 30):
+            radians = math.radians(angle)
+            start = (cx + int(math.cos(radians) * radius * 0.65),
+                     cy + int(math.sin(radians) * radius * 0.65))
+            end = (cx + int(math.cos(radians) * radius * 0.85),
+                   cy + int(math.sin(radians) * radius * 0.85))
+            pygame.draw.line(surf, (185, 140, 90), start, end, 2)
+        pygame.draw.ellipse(surf, (205, 155, 95),
+                            (cx - radius // 2, cy - radius // 2,
+                             radius // 2, radius // 4))
+
+    elif fruit_type == 'pineapple':
+        # Golden textured body with a leafy crown.
+        body = [
+            (cx - radius // 2, cy - radius),
+            (cx + radius // 2, cy - radius),
+            (cx + int(radius * 0.8), cy + radius // 2),
+            (cx, cy + radius),
+            (cx - int(radius * 0.8), cy + radius // 2),
+        ]
+        pygame.draw.polygon(surf, (205, 155, 35), body)
+        for row in range(-2, 3):
+            for col in range(-2, 3):
+                px = cx + col * radius // 3 + (row % 2) * radius // 6
+                py = cy + row * radius // 3
+                pygame.draw.line(surf, (245, 200, 75),
+                                 (px - 5, py - 5), (px + 5, py + 5), 2)
+        leaves = [
+            [(cx, cy - radius), (cx - radius // 2, cy - radius * 2),
+             (cx - radius // 5, cy - radius // 2)],
+            [(cx, cy - radius), (cx + radius // 2, cy - radius * 2),
+             (cx + radius // 5, cy - radius // 2)],
+            [(cx, cy - radius), (cx, cy - radius * 2 - 4),
+             (cx + 4, cy - radius // 2)],
+        ]
+        for leaf in leaves:
+            pygame.draw.polygon(surf, (45, 125, 45), leaf)
 
     elif fruit_type == 'banana':
         # Bright yellow ellipse (simulate curved banana body)
@@ -215,20 +265,50 @@ def _draw_whole_fruit(surf: pygame.Surface, cx: int, cy: int,
         pygame.draw.circle(surf, (180, 140, 20),
                            (cx + radius - 2, cy), 4)
 
-    elif fruit_type == 'cherry':
-        # Deep red body
-        pygame.draw.circle(surf, (170, 15, 30), (cx, cy), radius)
-        # Lighter red highlight
-        pygame.draw.ellipse(surf, (230, 80, 90),
+    elif fruit_type == 'plum':
+        # Deep purple stone fruit with a natural crease and bloom.
+        plum_rect = pygame.Rect(cx - radius, cy - int(radius * 0.88),
+                                radius * 2, int(radius * 1.76))
+        pygame.draw.ellipse(surf, (82, 28, 112), plum_rect)
+        pygame.draw.ellipse(surf, (140, 65, 165),
+                            (plum_rect.x + 4, plum_rect.y + 4,
+                             plum_rect.width - 8, plum_rect.height - 8), 3)
+        pygame.draw.arc(surf, (55, 20, 75), plum_rect,
+                        math.radians(75), math.radians(285), 3)
+        pygame.draw.ellipse(surf, (205, 150, 220),
                             (cx - radius // 2, cy - radius // 2,
-                             radius // 2, radius // 3))
-        pygame.draw.ellipse(surf, (255, 160, 165),
-                            (cx - radius // 2 + 2, cy - radius // 2 + 2,
-                             radius // 4, radius // 5))
-        # Green stem
-        pygame.draw.line(surf, (40, 160, 40),
-                         (cx, cy - radius),
-                         (cx + 6, cy - radius - 14), 2)
+                             radius // 2, radius // 4))
+
+    elif fruit_type == 'strawberry':
+        # Heart-shaped berry with leafy calyx and pale seeds.
+        top = cy - radius // 2
+        berry = [
+            (cx - radius, top),
+            (cx - radius // 2, top - radius // 3),
+            (cx, cy + radius),
+            (cx + radius // 2, top - radius // 3),
+            (cx + radius, top),
+            (cx + radius // 2, top + radius // 2),
+            (cx - radius // 2, top + radius // 2),
+        ]
+        pygame.draw.polygon(surf, (205, 30, 42), berry)
+        pygame.draw.circle(surf, (230, 48, 55), (cx - radius // 3, top), radius // 2)
+        pygame.draw.circle(surf, (230, 48, 55), (cx + radius // 3, top), radius // 2)
+        for seed_x, seed_y in [
+            (-radius // 2, top + 8), (0, top + 2), (radius // 2, top + 8),
+            (-radius // 3, top + radius // 2), (radius // 3, top + radius // 2),
+            (0, top + radius),
+        ]:
+            pygame.draw.ellipse(surf, (255, 220, 125),
+                                (cx + seed_x - 2, seed_y - 4, 4, 8))
+        leaves = [
+            (cx, top - radius // 2),
+            (cx - radius // 2, top - radius // 5),
+            (cx - radius // 8, top - radius // 8),
+            (cx + radius // 2, top - radius // 5),
+            (cx + radius // 8, top - radius // 8),
+        ]
+        pygame.draw.polygon(surf, (40, 135, 45), leaves)
 
 
 # ---------------------------------------------------------------------------
@@ -268,16 +348,35 @@ def _draw_inner_flesh(surf: pygame.Surface, cx: int, cy: int,
         # Center nub
         pygame.draw.circle(surf, (220, 150, 30), (cx, cy), 5)
 
-    elif fruit_type == 'guava':
-        # Pink flesh with seed cluster in center
-        pygame.draw.circle(surf, (250, 170, 185), (cx, cy), int(radius * 0.35))
-        seed_col = (200, 90, 110)
-        for i in range(8):
-            angle = math.radians(i * 45)
-            dist = radius * 0.22
-            px = int(cx + math.cos(angle) * dist)
-            py = int(cy + math.sin(angle) * dist)
-            pygame.draw.circle(surf, seed_col, (px, py), 3)
+    elif fruit_type == 'coconut':
+        pygame.draw.ellipse(surf, (250, 245, 220),
+                            (cx - int(radius * 0.65), cy - int(radius * 0.55),
+                             int(radius * 1.3), int(radius * 1.1)))
+        pygame.draw.circle(surf, (155, 110, 65),
+                           (cx - radius // 3, cy - radius // 4), 3)
+        pygame.draw.circle(surf, (155, 110, 65),
+                           (cx + radius // 4, cy - radius // 5), 3)
+        pygame.draw.circle(surf, (155, 110, 65),
+                           (cx, cy + radius // 4), 3)
+
+    elif fruit_type == 'kiwifruit':
+        pygame.draw.ellipse(surf, (140, 200, 70),
+                            (cx - int(radius * 0.7), cy - int(radius * 0.7),
+                             int(radius * 1.4), int(radius * 1.4)))
+        pygame.draw.circle(surf, (245, 235, 185), (cx, cy), int(radius * 0.2))
+        for i in range(12):
+            angle = math.radians(i * 30)
+            px = int(cx + math.cos(angle) * radius * 0.48)
+            py = int(cy + math.sin(angle) * radius * 0.48)
+            pygame.draw.ellipse(surf, (35, 25, 20), (px - 2, py - 4, 4, 8))
+
+    elif fruit_type == 'pineapple':
+        pygame.draw.circle(surf, (255, 215, 90), (cx, cy), int(radius * 0.75))
+        for angle in range(0, 360, 45):
+            radians = math.radians(angle)
+            ex = int(cx + math.cos(radians) * radius * 0.65)
+            ey = int(cy + math.sin(radians) * radius * 0.65)
+            pygame.draw.line(surf, (205, 155, 45), (cx, cy), (ex, ey), 2)
 
     elif fruit_type == 'apple':
         # Cream with 5-point star core hint
@@ -286,16 +385,6 @@ def _draw_inner_flesh(surf: pygame.Surface, cx: int, cy: int,
         pygame.draw.line(surf, (160, 120, 80),
                          (cx, cy - int(radius * 0.5)),
                          (cx, cy + int(radius * 0.5)), 2)
-
-    elif fruit_type == 'mango':
-        # Bright yellow centre
-        pygame.draw.circle(surf, (255, 245, 100), (cx, cy), int(radius * 0.4))
-        # Fibrous lines
-        for i in range(5):
-            angle = math.radians(i * 36 + 10)
-            ex = int(cx + math.cos(angle) * radius * 0.65)
-            ey = int(cy + math.sin(angle) * radius * 0.65)
-            pygame.draw.line(surf, (220, 190, 60), (cx, cy), (ex, ey), 1)
 
     elif fruit_type == 'banana':
         # Cream flesh, darker oval seed dots
@@ -306,10 +395,29 @@ def _draw_inner_flesh(surf: pygame.Surface, cx: int, cy: int,
             py = int(cy + math.sin(angle) * radius * 0.3)
             pygame.draw.circle(surf, (180, 160, 80), (px, py), 2)
 
-    elif fruit_type == 'cherry':
-        # Pale pink with centre dot
-        pygame.draw.circle(surf, (255, 190, 200), (cx, cy), int(radius * 0.5))
-        pygame.draw.circle(surf, (200, 100, 115), (cx, cy), 4)
+    elif fruit_type == 'plum':
+        pygame.draw.circle(surf, (245, 155, 175), (cx, cy), int(radius * 0.72))
+        pygame.draw.ellipse(surf, (130, 75, 55),
+                            (cx - radius // 5, cy - radius // 2,
+                             radius // 3, radius))
+
+    elif fruit_type == 'strawberry':
+        pygame.draw.polygon(
+            surf,
+            (245, 75, 85),
+            [
+                (cx - int(radius * 0.7), cy - radius // 3),
+                (cx, cy + int(radius * 0.75)),
+                (cx + int(radius * 0.7), cy - radius // 3),
+            ],
+        )
+        for seed_x, seed_y in [
+            (-radius // 3, cy - radius // 4), (0, cy - radius // 3),
+            (radius // 3, cy - radius // 4), (-radius // 4, cy + radius // 5),
+            (radius // 4, cy + radius // 5),
+        ]:
+            pygame.draw.ellipse(surf, (255, 220, 135),
+                                (cx + seed_x - 2, seed_y - 4, 4, 8))
 
 
 # ===========================================================================

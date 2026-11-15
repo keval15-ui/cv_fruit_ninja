@@ -84,6 +84,27 @@ class GameScreen:
             self.slice_sound = None
             print(f"[Warning] Failed to load slice sound: {error}")
 
+        # --- Fruit impact sounds ---
+        impact_sound_files = {
+            "apple": "Impact-Apple.wav",
+            "banana": "Impact-Banana.wav",
+            "coconut": "Impact-Coconut.wav",
+            "kiwifruit": "Impact-kiwifruit.wav",
+            "orange": "Impact-Orange.wav",
+            "pineapple": "Impact-Pineapple.wav",
+            "plum": "Impact-Plum.wav",
+            "strawberry": "Impact-Strawberry.wav",
+            "watermelon": "Impact-Watermelon.wav",
+        }
+        self.impact_sounds = {}
+        for fruit_type, filename in impact_sound_files.items():
+            try:
+                self.impact_sounds[fruit_type] = pygame.mixer.Sound(
+                    os.path.join(_BASE_DIR, "assets", "sounds", filename)
+                )
+            except pygame.error as error:
+                print(f"[Warning] Failed to load {filename}: {error}")
+
         try:
             self.bomb_fuse_sound = pygame.mixer.Sound(
                 os.path.join(_BASE_DIR, "assets", "sounds", "Bomb-Fuse.wav")
@@ -249,8 +270,12 @@ class GameScreen:
                                 self.bomb_fuse_channel = None
                             if self.bomb_explode_sound:
                                 self.bomb_explode_sound.play()
-                        elif self.slice_sound:
-                            self.slice_sound.play()
+                        else:
+                            if self.slice_sound:
+                                self.slice_sound.play()
+                            impact_sound = self.impact_sounds.get(fruit.type)
+                            if impact_sound:
+                                impact_sound.play()
 
                         if fruit.is_bomb:
                             self.game_over = True
