@@ -1,3 +1,4 @@
+import os
 import pygame
 from src.hand_tracker import HandTracker
 from src.blade import Blade
@@ -26,6 +27,31 @@ def main():
     menu_screen = MenuScreen(WIDTH, HEIGHT)
     customization_screen = CustomizationScreen(WIDTH, HEIGHT)
     game_screen = GameScreen(WIDTH, HEIGHT)
+
+    intro_music_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "assets",
+        "sounds",
+        "Fruit Ninja.mp3",
+    )
+    intro_music_loaded = False
+    try:
+        pygame.mixer.music.load(intro_music_path)
+        intro_music_loaded = True
+    except pygame.error as error:
+        print(f"[Warning] Failed to load intro music: {error}")
+
+    def sync_intro_music():
+        """Play the intro music only while outside the gameplay screen."""
+        should_play = current_state != "game"
+        if not intro_music_loaded:
+            return
+
+        if should_play:
+            if not pygame.mixer.music.get_busy():
+                pygame.mixer.music.play(-1)
+        else:
+            pygame.mixer.music.stop()
 
     # Initial Screen State
     current_state = "loading"  # "loading" -> "calibration" -> "menu" -> ("game" | "customization")
@@ -98,6 +124,8 @@ def main():
         elif current_state == "game":
             game_screen.update(blade, dt)
 
+        sync_intro_music()
+
         # 4. Rendering
         if current_state == "loading":
             loading_screen.draw(screen)
@@ -121,6 +149,7 @@ def main():
         pygame.display.flip()
 
     tracker.release()
+    pygame.mixer.music.stop()
     pygame.quit()
 
 if __name__ == "__main__":
