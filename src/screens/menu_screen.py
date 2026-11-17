@@ -207,8 +207,9 @@ class MenuScreen:
             CircleMenuButton("game_modes", "GAME MODE", "CHOOSE MODE", center_x + spacing, cy, radius=btn_radius, theme_color=(235, 170, 35))
         ]
         self.mode_buttons = [
-            CircleMenuButton("time_attack", "TIME ATTACK", "60 SECONDS", center_x - 135, cy, radius=btn_radius, theme_color=(235, 170, 35)),
-            CircleMenuButton("zen", "ZEN", "NO BOMBS", center_x + 135, cy, radius=btn_radius, theme_color=(70, 165, 75))
+            CircleMenuButton("time_attack", "TIME ATTACK", "60 SECONDS", center_x - 180, cy, radius=btn_radius, theme_color=(235, 170, 35)),
+            CircleMenuButton("zen", "ZEN", "NO BOMBS", center_x, cy, radius=btn_radius, theme_color=(70, 165, 75)),
+            CircleMenuButton("survival", "SURVIVAL", "ENDLESS RUN", center_x + 180, cy, radius=btn_radius, theme_color=(190, 55, 75))
         ]
         self.show_mode_menu = False
 
@@ -228,6 +229,8 @@ class MenuScreen:
                     return "time_attack"
                 elif event.key == pygame.K_2:
                     return "zen"
+                elif event.key == pygame.K_3:
+                    return "survival"
                 elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                     self.show_mode_menu = False
                 return None
@@ -286,7 +289,7 @@ class MenuScreen:
 
         # 4. Bottom Navigation Hint
         if self.show_mode_menu:
-            hint = "Choose a game mode  |  Keys: [1] Time Attack  [2] Zen  [Esc] Back"
+            hint = "Choose a game mode  |  Keys: [1] Time Attack  [2] Zen  [3] Survival  [Esc] Back"
         else:
             hint = "Choose an option  |  Keys: [1] Classic  [2] Blade  [3] Game Mode"
         foot_txt = self.small_font.render(hint, True, (160, 175, 195))

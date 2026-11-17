@@ -3,6 +3,7 @@ import math
 import pygame
 import random
 from src.fruit import Fruit
+from src.game_modes import GAME_MODES
 
 # ---------------------------------------------------------------------------
 # Asset path helper
@@ -53,9 +54,6 @@ class GameScreen:
         self.game_over = False
         self.time_remaining = 30.0  # 30-second countdown
         self.mode = "classic"
-        self.mode_title = "CLASSIC"
-        self.allow_bombs = True
-        self.spawn_interval = 55
 
         # Fonts
         self.font = pygame.font.SysFont("Arial", 32, bold=True)
@@ -176,25 +174,14 @@ class GameScreen:
             self.time_up_channel.stop()
             self.time_up_channel = None
         self.score = 0
-        self.mode = mode
-        self.mode_title = {
-            "classic": "CLASSIC",
-            "time_attack": "TIME ATTACK",
-            "zen": "ZEN",
-        }.get(mode, "CLASSIC")
-        self.lives = 5
+        mode_config = GAME_MODES.get(mode, GAME_MODES["classic"])
+        self.mode = mode if mode in GAME_MODES else "classic"
+        self.lives = mode_config.lives
         self.game_over = False
-        self.time_remaining = 30.0
-        self.allow_bombs = True
-        self.spawn_interval = 55
-        if mode == "time_attack":
-            self.time_remaining = 60.0
-            self.lives = 3
-            self.spawn_interval = 42
-        elif mode == "zen":
-            self.time_remaining = 60.0
-            self.allow_bombs = False
-            self.spawn_interval = 45
+        self.time_remaining = mode_config.duration
+        self.allow_bombs = mode_config.allow_bombs
+        self.spawn_interval = mode_config.spawn_interval
+        self.endless = mode_config.endless
         self.fruits.clear()
         self.sliced_halves.clear()
         self.particles.clear()
@@ -245,10 +232,11 @@ class GameScreen:
 
         if not self.game_over:
             # Countdown timer
-            self.time_remaining -= dt
-            if self.time_remaining <= 0:
-                self.time_remaining = 0
-                self.game_over = True
+            if not self.endless:
+                self.time_remaining -= dt
+                if self.time_remaining <= 0:
+                    self.time_remaining = 0
+                    self.game_over = True
 
                 if self.game_over_sound and not self.game_over_sound_played:
                     if self.time_up_sound:
@@ -348,7 +336,7 @@ class GameScreen:
     def _draw_hearts(self, surface):
         """Draw heart HUD in top-right corner."""
         spacing = 42
-        total_hearts = 3 if self.mode == "time_attack" else 5
+        total_hearts = 3 if self.mode in ("time_attack", "survival") else 5
         start_x = self.width - 40 - (total_hearts * spacing)
         y = 22
         for i in range(total_hearts):
@@ -360,9 +348,12 @@ class GameScreen:
 
     def _draw_timer(self, surface):
         """Draw countdown timer in top-center with styled background box."""
-        mins = int(self.time_remaining) // 60
-        secs = int(self.time_remaining) % 60
-        timer_str = f"{mins}:{secs:02d}"
+        if self.endless:
+            timer_str = "ENDLESS"
+        else:
+            mins = int(self.time_remaining) // 60
+            secs = int(self.time_remaining) % 60
+            timer_str = f"{mins}:{secs:02d}"
 
         # Flashing red when < 20s
         if self.time_remaining < 20:
@@ -426,7 +417,9 @@ class GameScreen:
                     ),
                 )
 
-            mode_surf = self.sub_font.render(self.mode_title, True, (255, 220, 80))
+            mode_surf = self.sub_font.render(
+                GAME_MODES[self.mode].title, True, (255, 220, 80)
+            )
             surface.blit(mode_surf, (25, 62))
 
             # Score — top left

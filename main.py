@@ -78,7 +78,7 @@ def main():
 
             elif current_state == "menu":
                 action = menu_screen.handle_event(event)
-                if action in ("classic", "time_attack", "zen"):
+                if action in ("classic", "time_attack", "zen", "survival"):
                     game_screen.reset(action)
                     current_state = "game"
                 elif action == "blade":
@@ -108,7 +108,7 @@ def main():
 
         elif current_state == "menu":
             action = menu_screen.update(pos, blade_speed, dt)
-            if action in ("classic", "time_attack", "zen"):
+            if action in ("classic", "time_attack", "zen", "survival"):
                 game_screen.reset(action)
                 current_state = "game"
             elif action == "blade":
