@@ -167,7 +167,7 @@ class MenuScreen:
     """
     Premium Cyber Fruit Ninja Landing Page.
     Features:
-    - Circular interactive target buttons for START, BLADE, MULTIPLAYER
+    - Circular interactive target buttons for game modes and BLADE
     - Ambient glowing particles
     - background-landing.jpg backdrop
     """
@@ -195,17 +195,22 @@ class MenuScreen:
             except Exception as e:
                 print(f"[Warning] Failed to load landing background: {e}")
 
-        # Setup Circular Buttons
-        btn_radius = 88
+        # Setup top-level buttons and the game-mode submenu.
+        btn_radius = 76
         cy = height // 2 + 85
-        spacing = 290
+        spacing = 215
         center_x = width // 2
 
         self.buttons = [
-            CircleMenuButton("start", "START", "CLASSIC SOLO", center_x - spacing, cy, radius=btn_radius, theme_color=(30, 125, 225)),
+            CircleMenuButton("classic", "CLASSIC", "5 LIVES", center_x - spacing, cy, radius=btn_radius, theme_color=(30, 125, 225)),
             CircleMenuButton("blade", "BLADE", "CUSTOMIZE", center_x, cy, radius=btn_radius, theme_color=(235, 75, 45)),
-            CircleMenuButton("multiplayer", "VS MODE", "MULTIPLAYER", center_x + spacing, cy, radius=btn_radius, theme_color=(235, 170, 35), badge="2-PLAYER")
+            CircleMenuButton("game_modes", "GAME MODE", "CHOOSE MODE", center_x + spacing, cy, radius=btn_radius, theme_color=(235, 170, 35))
         ]
+        self.mode_buttons = [
+            CircleMenuButton("time_attack", "TIME ATTACK", "60 SECONDS", center_x - 135, cy, radius=btn_radius, theme_color=(235, 170, 35)),
+            CircleMenuButton("zen", "ZEN", "NO BOMBS", center_x + 135, cy, radius=btn_radius, theme_color=(70, 165, 75))
+        ]
+        self.show_mode_menu = False
 
         self.info_modal = None
         self.modal_timer = 0.0
@@ -213,28 +218,39 @@ class MenuScreen:
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mx, my = event.pos
-            for btn in self.buttons:
+            for btn in self._active_buttons():
                 if btn.collide_point((mx, my)):
                     return self._trigger_action(btn.action_id)
 
         if event.type == pygame.KEYDOWN:
+            if self.show_mode_menu:
+                if event.key == pygame.K_1:
+                    return "time_attack"
+                elif event.key == pygame.K_2:
+                    return "zen"
+                elif event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                    self.show_mode_menu = False
+                return None
+
             if event.key in (pygame.K_1, pygame.K_s):
-                return "start"
+                return "classic"
             elif event.key in (pygame.K_2, pygame.K_b):
                 return "blade"
-            elif event.key in (pygame.K_3, pygame.K_m):
-                return self._trigger_action("multiplayer")
+            elif event.key == pygame.K_3:
+                return self._trigger_action("game_modes")
             elif event.key == pygame.K_ESCAPE and self.info_modal:
                 self.info_modal = None
 
         return None
 
     def _trigger_action(self, action_id):
-        if action_id == "multiplayer":
-            self.info_modal = "MULTIPLAYER 2-PLAYER CO-OP\nDual Hand Tracking / Split Screen Coming Soon!"
-            self.modal_timer = 2.5
+        if action_id == "game_modes":
+            self.show_mode_menu = True
             return None
         return action_id
+
+    def _active_buttons(self):
+        return self.mode_buttons if self.show_mode_menu else self.buttons
 
     def update(self, pos, blade_speed, dt):
         for orb in self.orbs:
@@ -245,7 +261,7 @@ class MenuScreen:
             if self.modal_timer <= 0:
                 self.info_modal = None
 
-        for btn in self.buttons:
+        for btn in self._active_buttons():
             if btn.update(pos, blade_speed, dt):
                 action = self._trigger_action(btn.action_id)
                 if action:
@@ -265,11 +281,15 @@ class MenuScreen:
             orb.draw(surface)
 
         # 3. Circular Buttons
-        for btn in self.buttons:
+        for btn in self._active_buttons():
             btn.draw(surface, self.btn_title_font, self.btn_sub_font, self.small_font)
 
         # 4. Bottom Navigation Hint
-        foot_txt = self.small_font.render("Use your index finger to slice any circle  |  Keys: [1] Start  [2] Blade  [3] Multiplayer", True, (160, 175, 195))
+        if self.show_mode_menu:
+            hint = "Choose a game mode  |  Keys: [1] Time Attack  [2] Zen  [Esc] Back"
+        else:
+            hint = "Choose an option  |  Keys: [1] Classic  [2] Blade  [3] Game Mode"
+        foot_txt = self.small_font.render(hint, True, (160, 175, 195))
         surface.blit(foot_txt, (self.width // 2 - foot_txt.get_width() // 2, self.height - 35))
 
         # 5. Modal

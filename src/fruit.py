@@ -531,11 +531,11 @@ class Fruit:
     Handles physics, rotation and slice splitting.
     """
 
-    def __init__(self, screen_width, screen_height):
+    def __init__(self, screen_width, screen_height, allow_bombs=True):
         self.screen_width = screen_width
         self.screen_height = screen_height
 
-        self.is_bomb = random.random() < 0.30
+        self.is_bomb = allow_bombs and random.random() < 0.30
 
         if self.is_bomb:
             self.type = 'bomb'
